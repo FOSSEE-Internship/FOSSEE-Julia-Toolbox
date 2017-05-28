@@ -5,7 +5,6 @@
 extern int double_scilab_to_julia(int *piAddressVar, jl_value_t **ret);
 extern int double_julia_to_scilab(jl_value_t *input, int position);
 
-
 int sci_call_julia(char *fname, unsigned long fname_len) {
     // Error management variable
     SciErr sciErr;
@@ -27,7 +26,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     }
 
     if(!isStringType(pvApiCtx, addrFunctionName)) {
-        Scierror(999, "%s: argument #1 not a string: string expected\n", fname, 1);
+        Scierror(999, "%s: argument #%d not a string: string expected\n", fname, 1);
         return 0;
     }
 
@@ -42,13 +41,15 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     ////////// Julia Init Code //////////
     /* required: setup the Julia context */
     jl_init(NULL);
+
     // get function using the function name provided
     jl_function_t *func = jl_get_function(jl_base_module, functionName);
     if (jl_exception_occurred())
         printf("%s \n", jl_typeof_str(jl_exception_occurred()));
-    
+
+
     jl_value_t **inpArgs;
-    JL_GC_PUSHARGS(inpArgs, nInputArgs); 
+    JL_GC_PUSHARGS(inpArgs, nInputArgs - 1); 
 
     int *piAddressVar;
     for (i = 1; i != nInputArgs; i++) {
@@ -58,22 +59,36 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             printError(&sciErr, 0);
             return 0;
         }
+
         if (isDoubleType(pvApiCtx, piAddressVar)) {
-            double_scilab_to_julia(piAddressVar, &(inpArgs[i]));
+            double_scilab_to_julia(piAddressVar, &(inpArgs[i - 1]));
+        }
+        else {
+            Scierror(999, "%s: argument #%d not implemented yet: double expected\n", fname, i + 1);
+            return 0;
         }
     }
 
-    /* run Julia commands */
-    jl_value_t *ret = jl_call(functionName, inpArgs, nInputArgs - 1);
+    /* run Julia function */
+    sciprint("Calling the actual function \n");
+    jl_value_t *ret = jl_call(func, inpArgs, nInputArgs - 1);
+    
+    JL_GC_POP();
     JL_GC_PUSH1(&ret);
+    
+    if(jl_is_tuple(ret)) {
+        sciprint("%s: multiple return values\n", functionName);
+    }
+    else {
+        sciprint("%s: single return value\n", functionName);
+    }
+
+    sciprint("Convert julia variables back to scilab\n");
     double_julia_to_scilab(ret, nbInputArgument(pvApiCtx) + 1);
     JL_GC_POP();
-    JL_GC_POP();
-    AssignOutputVariable(pvApiCtx, 1) = nbInputArgument(pvApiCtx) + 1;
 
-    // if (jl_is_type(ret)) {
-        // ret_unboxed = jl_unbox_float64(ret);
-    // }
+
+    AssignOutputVariable(pvApiCtx, 1) = nbInputArgument(pvApiCtx) + 1;
 
     /* strongly recommended: notify Julia that the
          program is about to terminate. this allows
@@ -82,17 +97,5 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     */
     jl_atexit_hook(0);
 
-
-    // TODO : Check input/output arguments
-    ////////// Check the number of input and output arguments //////////
-    /* --> [c, d, e] = matopt(a, b) */
-    /* check that we have only 2 input arguments */
-    /* check that we have only 3 output argument */
-
-    // CheckInputArgument(pvApiCtx, 2, 2) ;
-    // CheckOutputArgument(pvApiCtx, 4, 4) ;
-
-
-    
     return 0;
 }

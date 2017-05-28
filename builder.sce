@@ -1,4 +1,5 @@
 files = ['sci_call_julia.c', 'convert_types.c']
+// files = ['sci_call_julia.c']
 
 root = get_absolute_file_path('builder.sce')
 
@@ -16,13 +17,13 @@ else
 
 setenv('JULIA_HOME', julia_dir + '/bin')
 
-include = '-I' + julia_dir + '/include/julia'
+include = ' -g -I' + julia_dir + '/include/julia -DJULIA_ENABLE_THREADING'
 ldflag = '-L' + julia_dir + '/lib/julia -L' + julia_dir + '/lib -ljulia'
 ilib_build('build_lib', ['callJulia','sci_call_julia'], files, [], [], ldflag, include);
 exec loader.sce
-A = [1, 2; 3, 4;]
-B = [1, 2; 3, 4;]
-[C] = callJulia(A, B)
+A = [1.1, 2.2]
+B = [971.801, 132.132]
+[C] = callJulia('+', A, B)
 exec unloader.sce
 
 clear A B C D E julia files julia_dir julialibpath root include ldflag
