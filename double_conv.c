@@ -2,10 +2,11 @@
 #include <julia.h>
 #include "Scierror.h"
 
-int double_scilab_to_julia(int *piAddressVar, jl_value_t **ret) {
+int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
     // Error management variable
     SciErr sciErr;
 
+    // getting data from Scilab
     int m, n;
     double *data = NULL;
     sciErr = getMatrixOfDouble(pvApiCtx, piAddressVar, &m, &n, &data);
@@ -30,15 +31,17 @@ int double_scilab_to_julia(int *piAddressVar, jl_value_t **ret) {
     for(int i = 0; i != m * n; i++ ) 
         xData[i] = data[i];
 
+
     if (jl_exception_occurred()) {
         printf("%s \n", jl_typeof_str(jl_exception_occurred()));
         return 0;
     }
+    // free(data);
     return 1;
 
 }
 
-int double_julia_to_scilab(jl_value_t *input, int position) {
+int double_jl_to_sci(jl_value_t *input, int position) {
     SciErr sciErr;
 
     jl_array_t *matrix = (jl_array_t *) input;

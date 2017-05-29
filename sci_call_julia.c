@@ -2,8 +2,8 @@
 #include <julia.h>
 #include "Scierror.h"
 
-extern int double_scilab_to_julia(int *piAddressVar, jl_value_t **ret);
-extern int double_julia_to_scilab(jl_value_t *input, int position);
+extern int double_sci_to_jl(int *piAddressVar, jl_value_t **ret);
+extern int double_jl_to_sci(jl_value_t *input, int position);
 
 int sci_call_julia(char *fname, unsigned long fname_len) {
     // Error management variable
@@ -61,7 +61,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         }
 
         if (isDoubleType(pvApiCtx, piAddressVar)) {
-            double_scilab_to_julia(piAddressVar, &(inpArgs[i - 1]));
+            double_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
         }
         else {
             Scierror(999, "%s: argument #%d not implemented yet: double expected\n", fname, i + 1);
@@ -70,12 +70,14 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     }
 
     /* run Julia function */
-    sciprint("Calling the actual function \n");
+    sciprint("%s: calling the actual function \n", fname);
     jl_value_t *ret = jl_call(func, inpArgs, nInputArgs - 1);
     
     JL_GC_POP();
     JL_GC_PUSH1(&ret);
     
+
+    // TODO: multiple returns handling
     if(jl_is_tuple(ret)) {
         sciprint("%s: multiple return values\n", functionName);
     }
@@ -83,12 +85,23 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         sciprint("%s: single return value\n", functionName);
     }
 
-    sciprint("Convert julia variables back to scilab\n");
-    double_julia_to_scilab(ret, nbInputArgument(pvApiCtx) + 1);
+    sciprint("%s: %s", fname, jl_typeof(ret));
+    // if(jl_typeis(ret, jl_array_any_type))
+    //     sciprint("%s: return is an array type", functionName);
+    // else if(jl_typeis(ret, jl_float64_type)) 
+    //     sciprint("%s: return is an float64 type", functionName);
+
+
+    sciprint("%s: convert julia variables back to scilab\n", fname);
+    double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
+    AssignOutputVariable(pvApiCtx, 1) = nbInputArgument(pvApiCtx) + 1;
+    // }
+    // else {
+    //     Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
+    // }
     JL_GC_POP();
 
 
-    AssignOutputVariable(pvApiCtx, 1) = nbInputArgument(pvApiCtx) + 1;
 
     /* strongly recommended: notify Julia that the
          program is about to terminate. this allows

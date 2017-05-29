@@ -1,5 +1,5 @@
-files = ['sci_call_julia.c', 'convert_types.c']
-// files = ['sci_call_julia.c']
+files = ['sci_call_julia.c', 'double_conv.c']
+// files = ['sci_call_julia.c', 'double_conv.c', 'bool_conv.c']
 
 root = get_absolute_file_path('builder.sce')
 
@@ -23,7 +23,7 @@ ilib_build('build_lib', ['callJulia','sci_call_julia'], files, [], [], ldflag, i
 exec loader.sce
 A = [1.1, 2.2]
 B = [971.801, 132.132]
-[C] = callJulia('+', A, B)
+callJulia('divrem', A, B)
 exec unloader.sce
 
 clear A B C D E julia files julia_dir julialibpath root include ldflag
