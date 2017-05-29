@@ -7,6 +7,7 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
     SciErr sciErr;
 
     // getting data from Scilab
+
     int m, n;
     double *data = NULL;
     sciErr = getMatrixOfDouble(pvApiCtx, piAddressVar, &m, &n, &data);
@@ -16,37 +17,41 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         return 0;
     }
 
+    if (m == 1 && n == 1) {
+        *ret = jl_box_float64(*data);
+    }
+    else {
+        jl_value_t *array_type = jl_apply_array_type(jl_float64_type, 2);
+        
+        // TODO: rather than creating a new julia variable
+        // just create a thin wrapper using 'jl_ptr_to_array'
 
-    jl_value_t *array_type = jl_apply_array_type(jl_float64_type, 2);
-    
-    // TODO: rather than creating a new julia variable
-    // just create a thin wrapper using 'jl_ptr_to_array'
-
-    // *ret = (jl_value_t *) jl_ptr_to_array(array_type, data, dims, 0);
-    *ret = (jl_value_t*) jl_alloc_array_2d(array_type, m, n);
+        // *ret = (jl_value_t *) jl_ptr_to_array(array_type, data, dims, 0);
+        *ret = (jl_value_t*) jl_alloc_array_2d(array_type, m, n);
 
 
-    // copying data to julia data structure
-    double *xData = (double*) jl_array_data(*ret);
-    for(int i = 0; i != m * n; i++ ) 
-        xData[i] = data[i];
-
+        // copying data to julia data structure
+        double *xData = (double*) jl_array_data(*ret);
+        for(int i = 0; i != m * n; i++ ) 
+            xData[i] = data[i];
+            // sciprint("%f\n", xData[i]);
+    }
 
     if (jl_exception_occurred()) {
         printf("%s \n", jl_typeof_str(jl_exception_occurred()));
         return 0;
     }
-    // free(data);
-    return 1;
+    
+    
 
+    return 1;
 }
+
 
 int double_jl_to_sci(jl_value_t *input, int position) {
     SciErr sciErr;
 
     jl_array_t *matrix = (jl_array_t *) input;
-
-    sciprint("%d \n", matrix);
 
     int m, n;
     double *data = (double*) jl_array_data(matrix);
