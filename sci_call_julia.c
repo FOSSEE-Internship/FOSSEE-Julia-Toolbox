@@ -89,12 +89,11 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     JL_GC_POP();
 
     JL_GC_PUSH1(&ret);
+    
     if (jl_exception_occurred()) {
         sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
         JL_GC_POP();
-    
         jl_atexit_hook(0);
-
         return 0;
     }
 
@@ -121,17 +120,20 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             }
             else if(jl_typeis(newargs, jl_apply_array_type(jl_int64_type, 2)) || 
                 jl_typeis(newargs, jl_apply_array_type(jl_int64_type, 2))) {
-                Scierror(999, "%s: integer64 types not in Scilab\n", fname);
+                JL_GC_POP();
+                jl_atexit_hook(0);
+                Scierror(999, "%s: integer64 types not supported in Scilab\n", fname);
             }
             else {
+                JL_GC_POP();
+                jl_atexit_hook(0);
                 Scierror(999, "%s: non double types not implemented yet: double/integer return expected\n", fname);
             }
 
             if (err == 0) {
-                Scierror(999, "%s: error in converting julia variable to scilab variable\n", fname);
                 JL_GC_POP();
                 jl_atexit_hook(0);
-                return 0;
+                Scierror(999, "%s: error in converting julia variable to scilab variable\n", fname);
             }
             AssignOutputVariable(pvApiCtx, i + 1) = nbInputArgument(pvApiCtx) + i + 1;
 
@@ -139,10 +141,9 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     }
     else {
         sciprint("%s: single return value\n", functionName);
-        
-        if(jl_typeis(ret, jl_apply_array_type(jl_float64_type, 2))) {
-            sciprint("%s: Float 2D array\n", fname);
-
+        if(jl_typeis(ret, jl_float64_type) || jl_typeis(ret, jl_apply_array_type(jl_float64_type, 2))) {
+            
+            sciprint("%s: Float variable\n", fname);
             err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
         }
         else if(jl_typeis(ret, jl_apply_array_type(jl_int8_type, 2)) || 
@@ -151,11 +152,18 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             jl_typeis(ret, jl_apply_array_type(jl_uint16_type, 2)) || 
             jl_typeis(ret, jl_apply_array_type(jl_int32_type, 2)) || 
             jl_typeis(ret, jl_apply_array_type(jl_uint32_type, 2)) ) {
-            sciprint("%s: Integer 2D array\n", fname);
-
+            
+            sciprint("%s: Integer variable\n", fname);
             err = int_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
         }
+        else if(jl_typeis(ret, jl_apply_array_type(jl_int64_type, 2)) || 
+                jl_typeis(ret, jl_apply_array_type(jl_int64_type, 2))) {
+                JL_GC_POP();
+                jl_atexit_hook(0);
+                Scierror(999, "%s: integer64 types not supported in Scilab\n", fname);
+        }
         else {
+            JL_GC_POP();
             jl_atexit_hook(0);
             Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
         }
@@ -165,11 +173,14 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             jl_atexit_hook(0);
             return 0;
         }
+
         AssignOutputVariable(pvApiCtx, 1) = nbInputArgument(pvApiCtx) + 1;
 
     }
 
     JL_GC_POP();
+
+    // sciprint("%s: exiting...");
 
 
 
@@ -179,6 +190,8 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
          and run all finalizers
     */
     jl_atexit_hook(0);
+
+    sciprint("%s: exiting...");
 
     return 0;
 }
