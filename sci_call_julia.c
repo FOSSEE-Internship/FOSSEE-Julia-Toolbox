@@ -97,12 +97,12 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         for (i = 0; i != al; i++) {
             jl_value_t *newargs = jl_fieldref(ret, i);
             
-            if(jl_typeis(newargs, jl_apply_array_type(jl_float64_type, 2))) {
+            if(jl_typeis(newargs, jl_apply_array_type(jl_floatingpoint_type, 2))) {
                 double_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 AssignOutputVariable(pvApiCtx, i + 1) = nbInputArgument(pvApiCtx) + i + 1;
             }
             else {
-
+                Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
             }
 
         }
@@ -110,10 +110,15 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     else {
         sciprint("%s: single return value\n", functionName);
         
-        if(jl_typeis(ret, jl_apply_array_type(jl_float64_type, 2))) {
+        if(jl_typeis(ret, jl_apply_array_type(jl_floatingpoint_type, 2))) {
             sciprint("%s: 2D array\n", fname);
 
-            double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
+            int err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
+            if (err == 0) {
+                JL_GC_POP();
+                jl_atexit_hook(0);
+                return 0;
+            }
             AssignOutputVariable(pvApiCtx, 1) = nbInputArgument(pvApiCtx) + 1;
         }
         else {
