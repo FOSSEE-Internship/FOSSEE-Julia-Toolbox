@@ -1,5 +1,5 @@
-files = ['sci_call_julia.c', 'double_conv.c']
-// files = ['sci_call_julia.c', 'double_conv.c', 'bool_conv.c']
+// files = ['sci_call_julia.c', 'double_conv.c']
+files = ['sci_call_julia.c', 'double_conv.c', 'integer_conv.c']
 
 root = get_absolute_file_path('builder.sce')
 

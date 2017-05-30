@@ -1,9 +1,9 @@
 exec builder.sce
 
 exec loader.sce
-A = [12, 23.23]
-B = [971, 132.23]
-callJulia('+', A, B)
-exec unloader.sce
+A = [32, 34]
+B = 4
+callJulia('divrem', [32, 34], 4)
+// exec unloader.sce
 
-clear A B C D E
+// clear A B C D E

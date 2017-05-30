@@ -34,7 +34,7 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         tuple->a = m;
         tuple->b = n;
 
-        *ret = jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
+        *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
         JL_GC_POP();
     }
 
@@ -42,7 +42,7 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         printf("%s \n", jl_typeof_str(jl_exception_occurred()));
         return 0;
     }
-    
+
     return 1;
 }
 
