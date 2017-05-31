@@ -3,17 +3,32 @@ files = ['sci_call_julia.c', 'double_conv.c', 'integer_conv.c']
 
 root = get_absolute_file_path('builder.sce')
 
-julia_dir = root + 'julia'
-julialibpath = julia_dir + '/lib/'
+third_party_dir = root + 'thirdparty'
 
 // Loading dependencies 
 
 if getos() == 'Windows' then 
 	disp("Not yet implemented for Windows")
 	return;
-else 
+elseif getos() == 'Darwin' then
+	julia_dir = third_party_dir + '/darwin/julia'
+	julialibpath = julia_dir + '/lib/'
+
+	setenv('LD_LIBRARY_PATH', third_party_dir + '/darwin/julia/lib/julia:' + getenv('LD_LIBRARY_PATH'))
+	setenv('DYLD_LIBRARY_PATH', third_party_dir + '/darwin/julia/lib/julia:' + getenv('DYLD_LIBRARY_PATH'))
+
+	// link(julialibpath + 'julia/libstdc++' + getdynlibext() + '.6')
+	link(julialibpath + 'libjulia' + getdynlibext())
+
+elseif getos() == 'Linux' then
+	julia_dir = third_party_dir + '/linux/julia'
+	julialibpath = julia_dir + '/lib/'
+
 	link(julialibpath + 'julia/libstdc++' + getdynlibext() + '.6')
 	link(julialibpath + 'libjulia' + getdynlibext())
+end
+
+disp(getenv('DYLD_LIBRARY_PATH'))
 
 setenv('JULIA_HOME', julia_dir + '/bin')
 
