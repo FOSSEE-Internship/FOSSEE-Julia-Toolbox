@@ -28,8 +28,6 @@ elseif getos() == 'Linux' then
 	link(julialibpath + 'libjulia' + getdynlibext())
 end
 
-disp(getenv('DYLD_LIBRARY_PATH'))
-
 setenv('JULIA_HOME', julia_dir + '/bin')
 
 include = ' -g -I' + julia_dir + '/include/julia -DJULIA_ENABLE_THREADING'

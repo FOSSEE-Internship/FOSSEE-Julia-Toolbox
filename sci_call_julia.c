@@ -69,17 +69,22 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         }
 
         if (isIntegerType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Integer array\n", fname, i);
-            int_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
+            sciprint("%s: argument #%d: Integer variable\n", fname, i);
+            err = int_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
         }
         else if (isDoubleType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Double array\n", fname, i);
-            double_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
+            sciprint("%s: argument #%d: Double variable\n", fname, i);
+            err = double_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
         }
         else {
-            Scierror(999, "%s: argument #%d not implemented yet: double expected\n", fname, i + 1);
+            Scierror(999, "%s: argument #%d not implemented yet\n", fname, i + 1);
             jl_atexit_hook(0);
             return 0;
+        }
+        if(err == 0) {
+            JL_GC_POP();
+            jl_atexit_hook(0);
+            return err;
         }
     }
 
@@ -104,36 +109,50 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         for (i = 0; i != al; i++) {
             jl_value_t *newargs = jl_fieldref(ret, i);
             
-            if(jl_typeis(newargs, jl_apply_array_type(jl_float64_type, 2))) {
-                sciprint("%s: Double 2D array\n", fname);
+            if(jl_typeis(newargs, jl_float64_type) ||
+                jl_typeis(newargs, jl_apply_array_type(jl_float64_type, 2))) {
+                
+                sciprint("%s: Double variable\n", fname);
                 err = double_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
             }
-            else if(jl_typeis(newargs, jl_apply_array_type(jl_int8_type, 2)) || 
+            else if(jl_typeis(newargs, jl_int8_type) || 
+                jl_typeis(newargs, jl_uint8_type) || 
+                jl_typeis(newargs, jl_int16_type) || 
+                jl_typeis(newargs, jl_uint16_type) || 
+                jl_typeis(newargs, jl_int32_type) || 
+                jl_typeis(newargs, jl_uint32_type) || 
+
+                jl_typeis(newargs, jl_apply_array_type(jl_int8_type, 2)) || 
                 jl_typeis(newargs, jl_apply_array_type(jl_uint8_type, 2)) || 
                 jl_typeis(newargs, jl_apply_array_type(jl_int16_type, 2)) || 
                 jl_typeis(newargs, jl_apply_array_type(jl_uint16_type, 2)) || 
                 jl_typeis(newargs, jl_apply_array_type(jl_int32_type, 2)) || 
                 jl_typeis(newargs, jl_apply_array_type(jl_uint32_type, 2)) ) {
-                sciprint("%s: Integer 2D array\n", fname);
+                
+                sciprint("%s: Integer variable\n", fname);
 
                 err = int_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + 1);
             }
             else if(jl_typeis(newargs, jl_apply_array_type(jl_int64_type, 2)) || 
                 jl_typeis(newargs, jl_apply_array_type(jl_int64_type, 2))) {
+                
                 JL_GC_POP();
                 jl_atexit_hook(0);
                 Scierror(999, "%s: integer64 types not supported in Scilab\n", fname);
+                return 0;
             }
             else {
                 JL_GC_POP();
                 jl_atexit_hook(0);
                 Scierror(999, "%s: non double types not implemented yet: double/integer return expected\n", fname);
+                return 0;
             }
 
             if (err == 0) {
                 JL_GC_POP();
                 jl_atexit_hook(0);
                 Scierror(999, "%s: error in converting julia variable to scilab variable\n", fname);
+                return 0;
             }
             AssignOutputVariable(pvApiCtx, i + 1) = nbInputArgument(pvApiCtx) + i + 1;
 
@@ -146,12 +165,19 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             sciprint("%s: Float variable\n", fname);
             err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
         }
-        else if(jl_typeis(ret, jl_apply_array_type(jl_int8_type, 2)) || 
-            jl_typeis(ret, jl_apply_array_type(jl_uint8_type, 2)) || 
-            jl_typeis(ret, jl_apply_array_type(jl_int16_type, 2)) || 
-            jl_typeis(ret, jl_apply_array_type(jl_uint16_type, 2)) || 
-            jl_typeis(ret, jl_apply_array_type(jl_int32_type, 2)) || 
-            jl_typeis(ret, jl_apply_array_type(jl_uint32_type, 2)) ) {
+        else if(jl_typeis(ret, jl_int8_type) || 
+                jl_typeis(ret, jl_uint8_type) || 
+                jl_typeis(ret, jl_int16_type) || 
+                jl_typeis(ret, jl_uint16_type) || 
+                jl_typeis(ret, jl_int32_type) || 
+                jl_typeis(ret, jl_uint32_type) || 
+
+                jl_typeis(ret, jl_apply_array_type(jl_int8_type, 2)) || 
+                jl_typeis(ret, jl_apply_array_type(jl_uint8_type, 2)) || 
+                jl_typeis(ret, jl_apply_array_type(jl_int16_type, 2)) || 
+                jl_typeis(ret, jl_apply_array_type(jl_uint16_type, 2)) || 
+                jl_typeis(ret, jl_apply_array_type(jl_int32_type, 2)) || 
+                jl_typeis(ret, jl_apply_array_type(jl_uint32_type, 2)) ) {
             
             sciprint("%s: Integer variable\n", fname);
             err = int_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
@@ -161,11 +187,13 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 JL_GC_POP();
                 jl_atexit_hook(0);
                 Scierror(999, "%s: integer64 types not supported in Scilab\n", fname);
+                return 0;
         }
         else {
             JL_GC_POP();
             jl_atexit_hook(0);
             Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
+            return 0;
         }
         
         if (err == 0) {
@@ -179,9 +207,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     }
 
     JL_GC_POP();
-
-    // sciprint("%s: exiting...");
-
+    sciprint("%s: exiting...\n", fname);
 
 
     /* strongly recommended: notify Julia that the
@@ -191,7 +217,6 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     */
     jl_atexit_hook(0);
 
-    sciprint("%s: exiting...");
 
     return 0;
 }

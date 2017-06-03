@@ -5,22 +5,32 @@
 int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
     // Error management variable
     SciErr sciErr;
+    int err;
 
-    // getting data from Scilab
+    if(isScalar(pvApiCtx, piAddressVar)){
+        sciprint("double_sci_to_jl: Scalar Double\n");
+        double data;
+        err = getScalarDouble(pvApiCtx, piAddressVar, &data);
+        if (err)
+        {
+            return 0;
+        }
 
-    int m, n;
-    double *data = NULL;
-    sciErr = getMatrixOfDouble(pvApiCtx, piAddressVar, &m, &n, &data);
-    if (sciErr.iErr)
-    {
-        printError(&sciErr, 0);
-        return 0;
-    }
-
-    if (m == 1 && n == 1) {
-        *ret = jl_box_float64(*data);
+        *ret = jl_box_float64(data);
     }
     else {
+        int m, n;
+        double *data = NULL;
+        sciprint("double_sci_to_jl: Matrix Double\n");
+        
+        // getting data from Scilab
+        sciErr = getMatrixOfDouble(pvApiCtx, piAddressVar, &m, &n, &data);
+        if (sciErr.iErr)
+        {
+            printError(&sciErr, 0);
+            return 0;
+        }
+
         jl_value_t *array_type = jl_apply_array_type(jl_float64_type, 2);
         
         jl_value_t *types[] = {(jl_value_t*)jl_long_type, (jl_value_t*)jl_long_type};

@@ -10,8 +10,8 @@ if fileinfo('loader.sce') <> [] then
   mdelete('loader.sce');
 end
 // ------------------------------------------------------
-if fileinfo('libbuild_lib.dylib') <> [] then
-  mdelete('libbuild_lib.dylib');
+if fileinfo('libbuild_lib.so') <> [] then
+  mdelete('libbuild_lib.so');
 end
 // ------------------------------------------------------
 if fileinfo('libbuild_lib.c') <> [] then
