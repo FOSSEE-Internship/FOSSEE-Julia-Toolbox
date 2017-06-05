@@ -32,20 +32,26 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         }
 
         jl_value_t *array_type = jl_apply_array_type(jl_float64_type, 2);
-        
-        jl_value_t *types[] = {(jl_value_t*)jl_long_type, (jl_value_t*)jl_long_type};
-        jl_tupletype_t *tt = jl_apply_tuple_type_v(types, 2);
-        typedef struct {
-            ssize_t a;
-            ssize_t b;
-        } ntuple2int;
-        ntuple2int *tuple = (ntuple2int*)jl_new_struct_uninit(tt);
-        JL_GC_PUSH1(&tuple);
-        tuple->a = m;
-        tuple->b = n;
 
-        *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
-        JL_GC_POP();
+        *ret = jl_alloc_array_2d(array_type, m, n);
+        double *xData = (double*) jl_array_data(ret);
+
+        for (int i = 0; i != m * n; i++) 
+            xData[i] = data[i];
+        
+        // jl_value_t *types[] = {(jl_value_t*)jl_long_type, (jl_value_t*)jl_long_type};
+        // jl_tupletype_t *tt = jl_apply_tuple_type_v(types, 2);
+        // typedef struct {
+        //     ssize_t a;
+        //     ssize_t b;
+        // } ntuple2int;
+        // ntuple2int *tuple = (ntuple2int*)jl_new_struct_uninit(tt);
+        // JL_GC_PUSH1(&tuple);
+        // tuple->a = m;
+        // tuple->b = n;
+
+        // *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
+        // JL_GC_POP();
     }
 
     if (jl_exception_occurred()) {

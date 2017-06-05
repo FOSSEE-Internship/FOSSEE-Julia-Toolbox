@@ -10,12 +10,12 @@ if fileinfo('loader.sce') <> [] then
   mdelete('loader.sce');
 end
 // ------------------------------------------------------
-if fileinfo('libbuild_lib.so') <> [] then
-  mdelete('libbuild_lib.so');
+if fileinfo('libjuliainterface.so') <> [] then
+  mdelete('libjuliainterface.so');
 end
 // ------------------------------------------------------
-if fileinfo('libbuild_lib.c') <> [] then
-  mdelete('libbuild_lib.c');
+if fileinfo('libjuliainterface.c') <> [] then
+  mdelete('libjuliainterface.c');
 end
 // ------------------------------------------------------
 chdir(curdir);
