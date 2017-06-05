@@ -7,8 +7,12 @@ extern "C" {
 #include <MALLOC.h>
 static int direct_gateway(char *fname,void F(void)) { F();return 0;};
 extern Gatefunc sci_call_julia;
+extern Gatefunc sci_init_julia;
+extern Gatefunc sci_exit_julia;
 static GenericTable Tab[]={
   {(Myinterfun)sci_gateway,sci_call_julia,"callJulia"},
+  {(Myinterfun)sci_gateway,sci_init_julia,"initJulia"},
+  {(Myinterfun)sci_gateway,sci_exit_julia,"exitJulia"},
 };
  
 int C2F(libbuild_lib)()

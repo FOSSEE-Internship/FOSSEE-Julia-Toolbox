@@ -59,13 +59,17 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
 
 int double_jl_to_sci(jl_value_t *input, int position) {
     SciErr sciErr;
+    int err;
 
-    int m, n;
     if(jl_typeis(input, jl_float64_type)){
         double data = jl_unbox_float64(input);
-        sciErr = createMatrixOfDouble(pvApiCtx, position, 1, 1, &data);        
+        err = createScalarDouble(pvApiCtx, position, data);
+        if (err) {
+            return 0;
+        }      
     }
     else if(jl_typeis(input, jl_apply_array_type(jl_float64_type, 2))) {
+        int m, n;
         double *data;
         jl_array_t *matrix = (jl_array_t *) input;
         data = (double*) jl_array_data(matrix);
@@ -83,13 +87,15 @@ int double_jl_to_sci(jl_value_t *input, int position) {
         m = jl_array_dim(matrix,0);
         n = jl_array_dim(matrix,1);
         sciErr = createMatrixOfDouble(pvApiCtx, position, m, n, data);
+
+        if (sciErr.iErr)
+        {
+            printError(&sciErr, 0);
+            return 0;
+        }
     }
 
-    if (sciErr.iErr)
-    {
-        printError(&sciErr, 0);
-        return 0;
-    }
+    
 
 
     return 1;

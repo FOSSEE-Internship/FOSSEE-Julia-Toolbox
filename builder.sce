@@ -1,12 +1,11 @@
 // files = ['sci_call_julia.c', 'double_conv.c']
-files = ['sci_call_julia.c', 'double_conv.c', 'integer_conv.c']
+files = ['sci_call_julia.c', 'double_conv.c', 'integer_conv.c', 'bool_conv.c']
 
 root = get_absolute_file_path('builder.sce')
 
 third_party_dir = root + 'thirdparty'
 
 // Loading dependencies 
-
 if getos() == 'Windows' then 
 	disp("Not yet implemented for Windows")
 	return;
@@ -28,10 +27,11 @@ elseif getos() == 'Linux' then
 	link(julialibpath + 'libjulia' + getdynlibext())
 end
 
+
 setenv('JULIA_HOME', julia_dir + '/bin')
 
 include = ' -g -I' + julia_dir + '/include/julia -DJULIA_ENABLE_THREADING'
 ldflag = '-L' + julia_dir + '/lib/julia -L' + julia_dir + '/lib -ljulia'
-ilib_build('build_lib', ['callJulia','sci_call_julia'], files, [], [], ldflag, include);
+ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], files, [], [], ldflag, include);
 
-clear julia files julia_dir julialibpath root include ldflag
+clear files julia_dir julialibpath root third_party_dir include ldflag
