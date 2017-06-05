@@ -187,7 +187,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             jl_typeis(ret, jl_apply_array_type(jl_bool_type, 2))) {
 
             sciprint("%s: Boolean variable\n", fname);
-            err = bool_jl_to_sci(ret, nbInputArgument(pvApiCtx) + i + 1);
+            err = bool_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
         }
         else if(jl_typeis(ret, jl_int8_type) || 
                 jl_typeis(ret, jl_uint8_type) || 
@@ -195,8 +195,8 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 jl_typeis(ret, jl_uint16_type) || 
                 jl_typeis(ret, jl_int32_type) || 
                 jl_typeis(ret, jl_uint32_type) || 
-                jl_typeis(ret, jl_int64_type, 2) || 
-                jl_typeis(ret, jl_uint64_type, 2) || 
+                jl_typeis(ret, jl_int64_type) || 
+                jl_typeis(ret, jl_uint64_type) || 
 
                 jl_typeis(ret, jl_apply_array_type(jl_int8_type, 2)) || 
                 jl_typeis(ret, jl_apply_array_type(jl_uint8_type, 2)) || 
@@ -209,12 +209,6 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             
             sciprint("%s: Integer variable\n", fname);
             err = int_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
-        }
-        else if(jl_typeis(ret, jl_int64_type, 2) || 
-                jl_typeis(ret, jl_apply_array_type(jl_int64_type, 2))) {
-                JL_GC_POP();
-                Scierror(999, "%s: integer64 types not supported in Scilab\n", fname);
-                return 0;
         }
         else {
             JL_GC_POP();

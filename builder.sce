@@ -23,8 +23,8 @@ elseif getos() == 'Linux' then
 	julia_dir = third_party_dir + '/linux/julia'
 	julialibpath = julia_dir + '/lib/'
 
-	link(julialibpath + 'julia/libstdc++' + getdynlibext() + '.6')
-	link(julialibpath + 'libjulia' + getdynlibext())
+	// link(julialibpath + 'julia/libstdc++' + getdynlibext() + '.6')
+	// link(julialibpath + 'libjulia' + getdynlibext())
 end
 
 
@@ -32,6 +32,6 @@ setenv('JULIA_HOME', julia_dir + '/bin')
 
 include = ' -g -I' + julia_dir + '/include/julia -DJULIA_ENABLE_THREADING'
 ldflag = '-L' + julia_dir + '/lib/julia -L' + julia_dir + '/lib -ljulia'
-ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], files, [], [], ldflag, include);
+ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], files, [julialibpath + 'libjulia'], [], ldflag, include);
 
 clear files julia_dir julialibpath root third_party_dir include ldflag

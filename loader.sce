@@ -10,6 +10,7 @@ if bOK then
   ulink(ilib);
 end
 //
+link('/home/harshith/scijulia/thirdparty/linux/julia/lib/libjulia' + getdynlibext());
 list_functions = [ 'callJulia';
                    'initJulia';
                    'exitJulia';

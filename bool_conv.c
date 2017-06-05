@@ -59,7 +59,7 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
 
     if (jl_typeis(input, jl_bool_type)){
         int8_t data = jl_unbox_bool(input);
-        sciprint("bool_jl_to_sci: scalar boolean output");
+        sciprint("bool_jl_to_sci: scalar boolean output\n");
         err = createScalarBoolean(pvApiCtx, position, (int) data);
         if (err) {
             return 0;
@@ -69,7 +69,7 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
         jl_array_t *matrix = (jl_array_t *) input;
         sciprint("%d \n", matrix);
 
-        sciprint("bool_jl_to_sci: matrix boolean output");
+        sciprint("bool_jl_to_sci: matrix boolean output\n");
 
         // data from the 
         int m, n;
@@ -86,7 +86,20 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
         m = jl_array_dim(matrix,0);
         n = jl_array_dim(matrix,1);
 
-        sciErr = createMatrixOfBoolean(pvApiCtx, position, m, n, data);
+
+        sciprint("%d x %d\n", m, n);
+
+        int *xData = malloc(m * n * sizeof(int));
+        for (int i = 0; i != m * n; i++) {
+            if (data[i] == 1) 
+                xData[i] = 1; 
+            else 
+                xData[i] = 0; 
+            sciprint("%d: before: %d, after: %d\n", i, data[i], xData[i]);
+        }
+
+        sciErr = createMatrixOfBoolean(pvApiCtx, position, m, n, xData);
+        free(xData);
         if (sciErr.iErr)
         {
             printError(&sciErr, 0);

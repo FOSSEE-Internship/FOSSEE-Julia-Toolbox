@@ -1,6 +1,8 @@
 #include "api_scilab.h"
 #include <julia.h>
 #include "Scierror.h"
+#include <limits.h>
+
 
 int int_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
     // Error management variable
@@ -171,6 +173,14 @@ int int_jl_to_sci(jl_value_t *input, int position) {
         sciprint("integer_conv: output argument #%d: jl_int32_type found\n", position);
         err = createScalarInteger32(pvApiCtx, position, data);
     }
+    else if(jl_typeis(input, jl_int64_type)) {
+        int64_t data = jl_unbox_int64(input);
+        if (data > INT_MAX || data < INT_MIN) {
+            sciprint("integer_conv: there is an overflow in integer conversion\n");
+        }
+        sciprint("integer_conv: output argument #%d: jl_int32_type found\n", position);
+        err = createScalarInteger32(pvApiCtx, position, (int) data);
+    }
 
     else if(jl_typeis(input, jl_uint8_type)) {
         unsigned char data = (unsigned char) jl_unbox_uint8(input);
@@ -186,6 +196,14 @@ int int_jl_to_sci(jl_value_t *input, int position) {
         unsigned int data = (unsigned int) jl_unbox_uint32(input);
         sciprint("integer_conv: output argument #%d: jl_uint32_type found\n", position);
         err = createScalarUnsignedInteger32(pvApiCtx, position, data);
+    }
+    else if(jl_typeis(input, jl_uint64_type)) {
+        uint64_t data = jl_unbox_uint64(input);
+        if (data / 2 > INT_MAX) {
+            sciprint("integer_conv: there is an overflow in integer conversion\n");
+        }
+        sciprint("integer_conv: output argument #%d: jl_int32_type found\n", position);
+        err = createScalarUnsignedInteger32(pvApiCtx, position, (unsigned int) data);
     }
     else {
         jl_array_t *matrix = (jl_array_t *) input;
