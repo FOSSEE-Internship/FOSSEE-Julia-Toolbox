@@ -79,10 +79,22 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         sciErr = getVarAddressFromPosition(pvApiCtx, i + 1, &piAddressVar);
         if (sciErr.iErr)
         {
+            JL_GC_POP();
+            printError(&sciErr, 0);
+            return 0;
+        }
+        
+        int iType = 0;
+        sciErr = getVarType(pvApiCtx, piAddressVar, &iType);
+
+        if (sciErr.iErr)
+        {
+            JL_GC_POP();
             printError(&sciErr, 0);
             return 0;
         }
 
+        sciprint("%s: argument #%d: VarType: %d\n", fname, i + 1, iType);
         if (isDoubleType(pvApiCtx, piAddressVar)) {
             sciprint("%s: argument #%d: Double variable\n", fname, i);
             err = double_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
@@ -94,6 +106,33 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         else if (isIntegerType(pvApiCtx, piAddressVar)) {
             sciprint("%s: argument #%d: Integer variable\n", fname, i);
             err = int_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
+        }
+        else if(isHypermatType(pvApiCtx, piAddressVar)) {
+            sciprint("%s: argument #%d: Hypermat variable\n", fname, i);
+            int varType;
+            sciErr = getHypermatType(pvApiCtx, piAddressVar, &varType);
+            if (sciErr.iErr)
+            {
+                JL_GC_POP();
+                printError(&sciErr, 0);
+                return 0;
+            }
+
+            sciprint("%s: argument #%d: Variable type %d \n", fname, i, varType);
+            
+            switch(varType) {
+                case 1: // double
+                    err = double_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
+                    break;
+                case 4: // boolean
+                    err = bool_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
+                    break;
+                case 8: // integer
+                    err = int_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
+                    break;
+                default:
+                    break;
+            }
         }
         else {
             Scierror(999, "%s: argument #%d not implemented yet\n", fname, i + 1);

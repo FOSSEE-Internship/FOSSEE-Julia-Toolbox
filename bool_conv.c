@@ -19,6 +19,55 @@ int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
 
         *ret = jl_box_bool((int8_t) data);
     }
+    else if (isHypermatType(pvApiCtx, piAddressVar)) {
+        int *dims;
+        int ndims;
+        int *data;
+        int len = 1;
+        
+        sciprint("double_sci_to_jl: Hypermat Double\n");
+
+        sciErr = getHypermatOfBoolean(pvApiCtx, piAddressVar, &dims, &ndims, &data);
+        if (sciErr.iErr)
+        {
+            printError(&sciErr, 0);
+            return 0;
+        }
+
+        
+        sciprint("double_sci_to_jl: size: (");
+        for(int i = 0; i != ndims; i++) {
+            len *= dims[i];
+            sciprint("%d", dims[i]);
+            if (i != ndims - 1) 
+                sciprint(", ");
+        }
+        sciprint(")\n");
+        
+
+        jl_value_t *array_type = jl_apply_array_type(jl_bool_type, ndims);
+
+        // copying data to julia data structure
+        int8_t *xData = (int8_t*) malloc(sizeof(int8_t) * len);
+        for(int i = 0; i != len; i++ ) 
+            xData[i] = (int8_t) data[i];
+        
+        jl_value_t *types[] = {(jl_value_t*)jl_long_type, (jl_value_t*)jl_long_type};
+        jl_tupletype_t *tt = jl_apply_tuple_type_v(types, ndims);
+        typedef struct {
+            ssize_t a[ndims];
+        } ntupleint;
+        
+        ntupleint *tuple = (ntupleint*)jl_new_struct_uninit(tt);
+        JL_GC_PUSH1(&tuple);
+
+        for (int i = 0; i != ndims; i++)
+            (tuple->a)[i] = dims[i];
+
+        *ret = (jl_value_t*) jl_ptr_to_array(array_type, xData, (jl_value_t*)tuple, 0);
+        JL_GC_POP();
+
+    }
     else {
         int m, n;
         int *data = NULL;

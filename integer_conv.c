@@ -58,6 +58,109 @@ int int_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             return 0;
         }
     }
+    else if (isHypermatType(pvApiCtx, piAddressVar)) {
+        int *dims;
+        int ndims;
+        void *data;
+
+        sciErr = getHypermatOfIntegerPrecision(pvApiCtx, piAddressVar, &precision);
+        if (sciErr.iErr)
+        {
+            printError(&sciErr, 0);
+            return 0;
+        }
+
+        sciprint("int_sci_to_jl: Hypermat Integer\n");
+
+        if (precision > 10){
+            if(precision%10 == 1){
+                unsigned char *temp;
+                sciErr = getHypermatOfUnsignedInteger8(pvApiCtx, piAddressVar, &dims, &ndims, &temp);
+                data = temp;
+            }
+            else if(precision%10 == 2){
+                short unsigned int *temp;
+                sciErr = getHypermatOfUnsignedInteger16(pvApiCtx, piAddressVar, &dims, &ndims, &temp);
+                data = temp;
+            }
+            else if(precision%10 == 4){
+                unsigned int *temp;
+                sciErr = getHypermatOfUnsignedInteger32(pvApiCtx, piAddressVar, &dims, &ndims, &temp);
+                data = temp;
+            }
+        }
+        else {
+            if(precision%10 == 1){
+                char *temp;
+                sciErr = getHypermatOfInteger8(pvApiCtx, piAddressVar, &dims, &ndims, &temp);
+                data = temp;
+            }
+            else if(precision%10 == 2){
+                short int *temp;
+                sciErr = getHypermatOfInteger16(pvApiCtx, piAddressVar, &dims, &ndims, &temp);
+                data = temp;
+            }
+            else if(precision%10 == 4){
+                int *temp;
+                sciErr = getHypermatOfInteger32(pvApiCtx, piAddressVar, &dims, &ndims, &temp);
+                data = temp;
+            }
+        }
+        if (sciErr.iErr)
+        {
+            printError(&sciErr, 0);
+            return 0;
+        }
+
+        sciprint("int_sci_to_jl: size: (");
+        for(int i = 0; i != ndims; i++) {
+            sciprint("%d", dims[i]);
+            if (i != ndims - 1) 
+                sciprint(", ");
+        }
+        sciprint(")\n");
+
+        jl_value_t *types[] = {(jl_value_t*)jl_long_type, (jl_value_t*)jl_long_type};
+        jl_tupletype_t *tt = jl_apply_tuple_type_v(types, ndims);
+        typedef struct {
+            ssize_t a[ndims];
+        } ntupleint;
+        
+        ntupleint *tuple = (ntupleint*)jl_new_struct_uninit(tt);
+        JL_GC_PUSH1(&tuple);
+
+        jl_value_t *array_type;
+        
+        if (precision > 10){
+            if(precision%10 == 1){
+                array_type = jl_apply_array_type(jl_uint8_type, 2);
+            }
+            else if(precision%10 == 2){
+                array_type = jl_apply_array_type(jl_uint16_type, 2);
+            }
+            else if(precision%10 == 4){
+                array_type = jl_apply_array_type(jl_uint32_type, 2);
+            }
+        }
+        else {
+            if(precision%10 == 1){
+                array_type = jl_apply_array_type(jl_int8_type, 2);
+            }
+            else if(precision%10 == 2){
+                array_type = jl_apply_array_type(jl_int16_type, 2);
+            }
+            else if(precision%10 == 4){
+                array_type = jl_apply_array_type(jl_int32_type, 2);
+            }
+        }
+
+        for (int i = 0; i != ndims; i++)
+            (tuple->a)[i] = dims[i];
+
+        *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
+        JL_GC_POP();
+
+    }
     else {
         // getting data from Scilab
         int m, n;

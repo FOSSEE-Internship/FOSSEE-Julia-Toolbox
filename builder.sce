@@ -28,10 +28,11 @@ elseif getos() == 'Linux' then
 end
 
 
+setenv('JULIA_DIR', julia_dir)
 setenv('JULIA_HOME', julia_dir + '/bin')
 
 include = '-g -I/home/harshith/scilab-5.5.2/include -I' + julia_dir + '/include/julia -DJULIA_ENABLE_THREADING'
-ldflag = '-L' + julia_dir + '/lib/julia -L' + julia_dir + '/lib -ljulia'
+ldflag = '-L' + julia_dir + '/lib/julia -L' + julialibpath + ' -Wl,--verbose -Wl,-rpath,' + julialibpath + ' -Wl,-Bstatic -ljulia' 
 // ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], files, [julialibpath + 'libjulia'], [], ldflag, include);
 // ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], files, [], [], ldflag, include);
 
