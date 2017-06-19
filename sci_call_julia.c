@@ -164,55 +164,69 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         for (i = 0; i != al; i++) {
             jl_value_t *newargs = jl_fieldref(ret, i);
             
-            if(jl_typeis(newargs, jl_float64_type) ||
-                jl_typeis(newargs, jl_apply_array_type(jl_float64_type, 2))) {
-                
-                sciprint("%s: Double variable\n", fname);
-                err = double_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
-            }
-            else if(jl_typeis(newargs, jl_bool_type) || 
-                jl_typeis(newargs, jl_apply_array_type(jl_bool_type, 2))) {
+            if(jl_is_array(newargs)) {
+                int ndims = jl_array_ndims(newargs);
 
-                sciprint("%s: Boolean variable\n", fname);
+                if (jl_typeis(newargs, jl_apply_array_type(jl_float64_type, ndims))) {
+                    sciprint("%s: Float variable\n", fname);
+                    err = double_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
+                }
+                else if (jl_typeis(newargs, jl_apply_array_type(jl_bool_type, ndims))) {
+                    sciprint("%s: Boolean variable\n", fname);
+                    err = bool_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
+                }
+                else if (jl_typeis(newargs, jl_apply_array_type(jl_int8_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type(jl_uint8_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type(jl_int16_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type(jl_uint16_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type(jl_int32_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type(jl_uint32_type, ndims)) ||
+                    jl_typeis(newargs, jl_apply_array_type(jl_int64_type, ndims)) ||
+                    jl_typeis(newargs, jl_apply_array_type(jl_uint64_type, ndims)) ) {
 
-                err = bool_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
-            }
-            else if(jl_typeis(newargs, jl_int8_type) || 
-                jl_typeis(newargs, jl_uint8_type) || 
-                jl_typeis(newargs, jl_int16_type) || 
-                jl_typeis(newargs, jl_uint16_type) || 
-                jl_typeis(newargs, jl_int32_type) || 
-                jl_typeis(newargs, jl_uint32_type) || 
-                jl_typeis(newargs, jl_int64_type) || 
-                jl_typeis(newargs, jl_uint64_type) || 
-
-                jl_typeis(newargs, jl_apply_array_type(jl_int8_type, 2)) || 
-                jl_typeis(newargs, jl_apply_array_type(jl_uint8_type, 2)) || 
-                jl_typeis(newargs, jl_apply_array_type(jl_int16_type, 2)) || 
-                jl_typeis(newargs, jl_apply_array_type(jl_uint16_type, 2)) || 
-                jl_typeis(newargs, jl_apply_array_type(jl_int32_type, 2)) || 
-                jl_typeis(newargs, jl_apply_array_type(jl_uint32_type, 2)) ||
-                jl_typeis(newargs, jl_apply_array_type(jl_int64_type, 2)) ||
-                jl_typeis(newargs, jl_apply_array_type(jl_uint64_type, 2))) {
-                
-                sciprint("%s: Integer variable\n", fname);
-
-                err = int_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
+                    sciprint("%s: Integer variable\n", fname);
+                    err = int_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
+                }
             }
             else {
-                JL_GC_POP();
-                Scierror(999, "%s: non double types not implemented yet: double/integer return expected\n", fname);
-                return 0;
+                if(jl_typeis(newargs, jl_float64_type)) {
+                    sciprint("%s: Float variable\n", fname);
+                    err = double_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
+                }
+                else if(jl_typeis(newargs, jl_bool_type)) {
+
+                    sciprint("%s: Boolean variable\n", fname);
+                    err = bool_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
+                }
+                else if(jl_typeis(newargs, jl_int8_type) || 
+                        jl_typeis(newargs, jl_uint8_type) || 
+                        jl_typeis(newargs, jl_int16_type) || 
+                        jl_typeis(newargs, jl_uint16_type) || 
+                        jl_typeis(newargs, jl_int32_type) || 
+                        jl_typeis(newargs, jl_uint32_type) || 
+                        jl_typeis(newargs, jl_int64_type) || 
+                        jl_typeis(newargs, jl_uint64_type) ) {
+                    
+                    sciprint("%s: Integer variable\n", fname);
+                    err = int_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
+                }
+                else {
+                    jl_value_t *var_type = jl_typeof(newargs);
+
+                    JL_GC_POP();
+                    Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
+                    return 0;
+                }
             }
 
+            
             if (err == 0) {
                 JL_GC_POP();
-                Scierror(999, "%s: error in converting julia variable to scilab variable\n", fname);
                 return 0;
             }
+
             sciprint("%s: assigning output variable #%d\n", fname, i + 1);
             AssignOutputVariable(pvApiCtx, i + 1) = nbInputArgument(pvApiCtx) + i + 1;
-
         }
     }
     else {

@@ -162,6 +162,7 @@ int double_jl_to_sci(jl_value_t *input, int position) {
     else if(jl_typeis(input, jl_float64_type)){
         sciprint("double_jl_to_sci: argument #%d: Scalar Double\n", position);
         double data = jl_unbox_float64(input);
+        sciprint("data: %f\n", data);
         err = createScalarDouble(pvApiCtx, position, data);
         if (err) {
             return 0;
