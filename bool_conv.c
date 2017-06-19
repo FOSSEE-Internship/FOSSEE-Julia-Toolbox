@@ -19,22 +19,40 @@ int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
 
         *ret = jl_box_bool((int8_t) data);
     }
-    else if (isHypermatType(pvApiCtx, piAddressVar)) {
-        int *dims;
+    else {
         int ndims;
+        int *dims;
+        int xdims[2];
         int *data;
         int len = 1;
-        
-        sciprint("double_sci_to_jl: Hypermat Double\n");
 
-        sciErr = getHypermatOfBoolean(pvApiCtx, piAddressVar, &dims, &ndims, &data);
-        if (sciErr.iErr)
-        {
-            printError(&sciErr, 0);
-            return 0;
+        if (isHypermatType(pvApiCtx, piAddressVar)) {
+            
+            sciprint("double_sci_to_jl: Hypermat Double\n");
+
+            sciErr = getHypermatOfBoolean(pvApiCtx, piAddressVar, &dims, &ndims, &data);
+            if (sciErr.iErr)
+            {
+                printError(&sciErr, 0);
+                return 0;
+            }         
+        }
+        else {
+            int m, n;
+            sciprint("bool_sci_to_jl: matrix boolean argument");
+            sciErr = getMatrixOfBoolean(pvApiCtx, piAddressVar, &m, &n, &data);
+            if (sciErr.iErr)
+            {
+                printError(&sciErr, 0);
+                return 0;
+            }
+            ndims = 2;
+            dims = xdims;
+
+            dims[0] = m;
+            dims[1] = n;
         }
 
-        
         sciprint("double_sci_to_jl: size: (");
         for(int i = 0; i != ndims; i++) {
             len *= dims[i];
@@ -52,7 +70,10 @@ int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         for(int i = 0; i != len; i++ ) 
             xData[i] = (int8_t) data[i];
         
-        jl_value_t *types[] = {(jl_value_t*)jl_long_type, (jl_value_t*)jl_long_type};
+        jl_value_t *types[ndims];
+        for (int i = 0; i != ndims; i++)
+            types[i] = (jl_value_t*)jl_long_type;
+
         jl_tupletype_t *tt = jl_apply_tuple_type_v(types, ndims);
         typedef struct {
             ssize_t a[ndims];
@@ -68,29 +89,7 @@ int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         JL_GC_POP();
 
     }
-    else {
-        int m, n;
-        int *data = NULL;
-        sciprint("bool_sci_to_jl: matrix boolean argument");
-        sciErr = getMatrixOfBoolean(pvApiCtx, piAddressVar, &m, &n, &data);
-        if (sciErr.iErr)
-        {
-            printError(&sciErr, 0);
-            return 0;
-        }
-
-        jl_value_t *array_type = jl_apply_array_type(jl_bool_type, 2);
-        
-        // cannot just copy the pointer to Julia
-        *ret = (jl_value_t*) jl_alloc_array_2d(array_type, m, n);
-
-
-        // copying data to julia data structure
-        int8_t *xData = (int8_t*) jl_array_data(*ret);
-        for(int i = 0; i != m * n; i++ ) 
-            xData[i] = (int8_t) data[i];
-
-    }
+    
 
 
     if (jl_exception_occurred()) {
@@ -105,8 +104,10 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
     // Error management
     SciErr sciErr;
     int err;
-
-    if (jl_typeis(input, jl_bool_type)){
+    if (jl_is_array(input)) {
+        
+    }
+    else if (jl_typeis(input, jl_bool_type)){
         int8_t data = jl_unbox_bool(input);
         sciprint("bool_jl_to_sci: scalar boolean output\n");
         err = createScalarBoolean(pvApiCtx, position, (int) data);

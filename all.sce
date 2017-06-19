@@ -3,4 +3,4 @@ exec loader.sce
 initJulia()
 exec test.sce
 
-// exec unloader.sce
+exec unloader.sce
