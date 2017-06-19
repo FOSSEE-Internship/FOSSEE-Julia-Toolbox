@@ -132,6 +132,7 @@ int double_jl_to_sci(jl_value_t *input, int position) {
     int err;
 
     if(jl_typeis(input, jl_float64_type)){
+        sciprint("double_jl_to_sci: argument #%d: Scalar Double\n", position);
         double data = jl_unbox_float64(input);
         err = createScalarDouble(pvApiCtx, position, data);
         if (err) {
@@ -141,6 +142,7 @@ int double_jl_to_sci(jl_value_t *input, int position) {
     else if(jl_typeis(input, jl_apply_array_type(jl_float64_type, 2))) {
         int m, n;
         double *data;
+        sciprint("double_jl_to_sci: argument #%d: Matrix Double\n", position);
         jl_array_t *matrix = (jl_array_t *) input;
         data = (double*) jl_array_data(matrix);
         if (jl_exception_occurred())
@@ -156,13 +158,19 @@ int double_jl_to_sci(jl_value_t *input, int position) {
         // Get the size of the matrix
         m = jl_array_dim(matrix,0);
         n = jl_array_dim(matrix,1);
-        sciErr = createMatrixOfDouble(pvApiCtx, position, m, n, data);
 
+        for (int i = 0; i != m * n; i++)
+            sciprint("%f\n", data[i]);
+        
+        sciErr = createMatrixOfDouble(pvApiCtx, position, m, n, data);
         if (sciErr.iErr)
         {
             printError(&sciErr, 0);
             return 0;
         }
+    }
+    else {
+        return 0;
     }
 
     

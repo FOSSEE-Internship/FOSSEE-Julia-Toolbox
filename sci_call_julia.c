@@ -96,19 +96,19 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
 
         sciprint("%s: argument #%d: VarType: %d\n", fname, i + 1, iType);
         if (isDoubleType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Double variable\n", fname, i);
+            sciprint("%s: argument #%d: Double variable\n", fname, i + 1);
             err = double_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
         }
         else if (isBooleanType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Boolean variable\n", fname, i);
+            sciprint("%s: argument #%d: Boolean variable\n", fname, i + 1);
             err = bool_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));    
         }
         else if (isIntegerType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Integer variable\n", fname, i);
+            sciprint("%s: argument #%d: Integer variable\n", fname, i + 1);
             err = int_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
         }
         else if(isHypermatType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Hypermat variable\n", fname, i);
+            sciprint("%s: argument #%d: Hypermat variable\n", fname, i + 1);
             int varType;
             sciErr = getHypermatType(pvApiCtx, piAddressVar, &varType);
             if (sciErr.iErr)
@@ -118,7 +118,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 return 0;
             }
 
-            sciprint("%s: argument #%d: Variable type %d \n", fname, i, varType);
+            sciprint("%s: argument #%d: Variable type %d \n", fname, i + 1, varType);
             
             switch(varType) {
                 case 1: // double
@@ -259,7 +259,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             JL_GC_POP();
             return 0;
         }
-
+        sciprint("%s: assigning output variable #%d", fname, 1);
         AssignOutputVariable(pvApiCtx, 1) = nbInputArgument(pvApiCtx) + 1;
 
     }
