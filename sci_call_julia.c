@@ -210,7 +210,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 Scierror(999, "%s: error in converting julia variable to scilab variable\n", fname);
                 return 0;
             }
-            sciprint("%s: assigning output variable #%d", fname, i + 1);
+            sciprint("%s: assigning output variable #%d\n", fname, i + 1);
             AssignOutputVariable(pvApiCtx, i + 1) = nbInputArgument(pvApiCtx) + i + 1;
 
         }
@@ -259,7 +259,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             JL_GC_POP();
             return 0;
         }
-        sciprint("%s: assigning output variable #%d", fname, 1);
+        sciprint("%s: assigning output variable #%d\n", fname, 1);
         AssignOutputVariable(pvApiCtx, 1) = nbInputArgument(pvApiCtx) + 1;
 
     }
