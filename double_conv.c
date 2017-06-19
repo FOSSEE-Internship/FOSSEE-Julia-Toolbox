@@ -97,7 +97,7 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         JL_GC_POP();
 
         double *xData = (double*) jl_array_data(*ret);
-        
+
         for (int i = 0; i != len; i++)
             sciprint("%f\n", xData[i]);
     }
@@ -117,24 +117,23 @@ int double_jl_to_sci(jl_value_t *input, int position) {
     int err;
 
     if (jl_is_array(input)) {
-        int ndims = jl_array_ndims(input);
-        if(jl_typeis(input, jl_apply_array_type(jl_float64_type, ndims))) {
-            int m, n;
+        jl_array_t *matrix = (jl_array_t *) input;
+        
+        // Get number of dimensions
+        int ndims = jl_array_ndims(matrix);
+        
+        if(jl_typeis(matrix, jl_apply_array_type(jl_float64_type, ndims))) {
+            // Get the size of the matrix
+            int dims[ndims];
+            int len = jl_array_len(matrix);
             double *data;
+            
             sciprint("double_jl_to_sci: argument #%d: Matrix Double\n", position);
-            jl_array_t *matrix = (jl_array_t *) input;
+
             data = (double*) jl_array_data(matrix);
             if (jl_exception_occurred())
                 sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
 
-            // Get number of dimensions
-            if (jl_exception_occurred())
-                sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
-
-
-
-            // Get the size of the matrix
-            int dims[ndims];
 
             sciprint("size: (");
             for (int i = 0; i != ndims; i++){
@@ -142,11 +141,7 @@ int double_jl_to_sci(jl_value_t *input, int position) {
                 sciprint("%d, ", dims[i]);
             }
             sciprint(")\n");
-
-            m = jl_array_dim(matrix,0);
-            n = jl_array_dim(matrix,1);
             
-            int len = jl_array_len(matrix);
 
             // for (int i = 0; i != len; i++)
             //     sciprint("%f\n", data[i]);

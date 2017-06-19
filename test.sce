@@ -17,7 +17,7 @@
 // test for double
 // A = callJulia('+', [6945233.43, 435.2], [43425.43, 23])
 
-// testing for boolean
-[z] = callJulia('!', [%T, %T, %T; %F, %T, %F])
-M = hypermat([2 3 2 2], [%T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F])
-[x] = callJulia('!', M)
+// // testing for boolean
+// [z] = callJulia('!', [%T, %T, %T; %F, %T, %F])
+// M = hypermat([2 3 2 2], [%T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F])
+// [x] = callJulia('!', M)

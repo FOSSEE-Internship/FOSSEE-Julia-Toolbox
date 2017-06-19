@@ -105,7 +105,53 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
     SciErr sciErr;
     int err;
     if (jl_is_array(input)) {
+        jl_array_t *matrix = (jl_array_t *) input;
         
+        // Get number of dimensions
+        int ndims = jl_array_ndims(matrix);
+
+        if (jl_typeis(matrix, jl_apply_array_type(jl_bool_type, ndims))) {
+            // Get the size of the matrix
+            int dims[ndims];
+            int len = jl_array_len(matrix);
+
+            sciprint("%d \n", matrix);
+
+            sciprint("bool_jl_to_sci: matrix boolean output\n");
+
+            // data from the 
+            int8_t *data = (int8_t*) jl_array_data(matrix);
+            if (jl_exception_occurred())
+                sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
+
+            sciprint("size: (");
+            for (int i = 0; i != ndims; i++){
+                dims[i] = jl_array_dim(matrix, i);
+                sciprint("%d, ", dims[i]);
+            }
+            sciprint(")\n");
+
+            int *xData = malloc(len * sizeof(int));
+            for (int i = 0; i != len; i++) {
+                xData[i] = data[i];
+                // if (data[i] == 1) 
+                //     xData[i] = 1; 
+                // else 
+                //     xData[i] = 0; 
+                // sciprint("%d: before: %d, after: %d\n", i, data[i], xData[i]);
+            }
+
+            if (ndims == 2)
+                sciErr = createMatrixOfBoolean(pvApiCtx, position, dims[0], dims[1], xData);
+            else 
+                sciErr = createHypermatOfBoolean(pvApiCtx, position, dims, ndims, xData);
+            free(xData);
+            if (sciErr.iErr)
+            {
+                printError(&sciErr, 0);
+                return 0;
+            }
+        }
     }
     else if (jl_typeis(input, jl_bool_type)){
         int8_t data = jl_unbox_bool(input);
@@ -115,46 +161,6 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
             return 0;
         }
     }
-    else if (jl_typeis(input, jl_apply_array_type(jl_bool_type, 2))) {
-        jl_array_t *matrix = (jl_array_t *) input;
-        sciprint("%d \n", matrix);
-
-        sciprint("bool_jl_to_sci: matrix boolean output\n");
-
-        // data from the 
-        int m, n;
-        int8_t *data = (int8_t*) jl_array_data(matrix);
-        if (jl_exception_occurred())
-            sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
-
-        // Get number of dimensions
-        int ndims = jl_array_ndims(matrix);
-        if (jl_exception_occurred())
-            sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
-
-        // Get the size of the matrix
-        m = jl_array_dim(matrix,0);
-        n = jl_array_dim(matrix,1);
-
-
-        sciprint("%d x %d\n", m, n);
-
-        int *xData = malloc(m * n * sizeof(int));
-        for (int i = 0; i != m * n; i++) {
-            if (data[i] == 1) 
-                xData[i] = 1; 
-            else 
-                xData[i] = 0; 
-            sciprint("%d: before: %d, after: %d\n", i, data[i], xData[i]);
-        }
-
-        sciErr = createMatrixOfBoolean(pvApiCtx, position, m, n, xData);
-        free(xData);
-        if (sciErr.iErr)
-        {
-            printError(&sciErr, 0);
-            return 0;
-        }
-    }
+    
     return 1;
 }
