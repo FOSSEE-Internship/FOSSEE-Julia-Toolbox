@@ -11,6 +11,8 @@ extern int int_jl_to_sci(jl_value_t *input, int position);
 extern int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret);
 extern int bool_jl_to_sci(jl_value_t *input, int position);
 
+extern int string_sci_to_jl(int *piAddressVar, jl_value_t **ret);
+extern int string_jl_to_sci(jl_value_t *input, int position);
 
 int sci_init_julia(char* fname, unsigned long fname_len) {
     
@@ -107,6 +109,10 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             sciprint("%s: argument #%d: Integer variable\n", fname, i + 1);
             err = int_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
         }
+        else if (isStringType(pvApiCtx, piAddressVar)) {
+            sciprint("%s: argument #%d: String variable\n", fname, i + 1);
+            err = string_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
+        }
         else if(isHypermatType(pvApiCtx, piAddressVar)) {
             sciprint("%s: argument #%d: Hypermat variable\n", fname, i + 1);
             int varType;
@@ -130,6 +136,8 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 case 8: // integer
                     err = int_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
                     break;
+                case 10: // string
+                    err = string_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
                 default:
                     break;
             }
@@ -187,6 +195,11 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                     sciprint("%s: Integer variable\n", fname);
                     err = int_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
+                else if (jl_typeis(newargs, jl_apply_array_type(jl_string_type, ndims))) {
+
+                    sciprint("%s: String variable\n", fname);
+                    err = string_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
+                }
             }
             else {
                 if(jl_typeis(newargs, jl_float64_type)) {
@@ -209,6 +222,10 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                     
                     sciprint("%s: Integer variable\n", fname);
                     err = int_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
+                }
+                else if (jl_typeis(newargs, jl_string_type)) {
+                    sciprint("%s: String variable\n", fname);
+                    err = string_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
                 else {
                     jl_value_t *var_type = jl_typeof(newargs);
@@ -254,6 +271,11 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 sciprint("%s: Integer variable\n", fname);
                 err = int_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
+            else if (jl_typeis(ret, jl_apply_array_type(jl_string_type, ndims))) {
+
+                sciprint("%s: String variable\n", fname);
+                err = string_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
+            }
         }
         else {
             if(jl_typeis(ret, jl_float64_type)) {
@@ -277,6 +299,10 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 sciprint("%s: Integer variable\n", fname);
                 err = int_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
+            else if (jl_typeis(ret, jl_string_type)) {
+                sciprint("%s: String variable\n", fname);
+                err = string_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
+            }
             else {
                 jl_value_t *var_type = jl_typeof(ret);
 
@@ -289,6 +315,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         
         if (err == 0) {
             JL_GC_POP();
+            Scierror(999, "%s: Error in getting data this data type from Julia\n", fname);
             return 0;
         }
 

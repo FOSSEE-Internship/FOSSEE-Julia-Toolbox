@@ -2,7 +2,7 @@ function builder_gw_cpp()
 	// This file is released under the 3-clause BSD license. See COPYING-BSD.
 	
 	// files = ['sci_call_julia.c', 'double_conv.c']
-	files = ['sci_call_julia.c', 'double_conv.c', 'integer_conv.c', 'bool_conv.c']
+	files = ['sci_call_julia.c', 'double_conv.c', 'integer_conv.c', 'bool_conv.c', 'string_conv.c']
 
 	root = get_absolute_file_path('builder.sce')
 	third_party_dir = root + 'thirdparty'
@@ -40,7 +40,7 @@ function builder_gw_cpp()
 	// setenv('LD_LIBRARY_PATH', third_party_dir + '/linux/julia/lib/julia:' + third_party_dir + '/linux/julia/lib:' + getenv('LD_LIBRARY_PATH'))
 
     WITHOUT_AUTO_PUTLHSVAR = %t;
-    
+
     
     // tbx_build_gateway("juliainterface", ..
     // ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], ..

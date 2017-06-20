@@ -24,6 +24,11 @@
 
 // [e] = callJulia('+', uint32(43), uint32(4))
 // [a, b] = callJulia('divrem', uint32(43), uint32(4))
-[c, d] = callJulia('divrem', [uint32(43), uint32(4)], uint32(5))
-M = hypermat([2 3 2 2],uint32(1:24))
-[x, y] = callJulia('divrem', M, uint32(5))
+// [c, d] = callJulia('divrem', [uint32(43), uint32(4)], uint32(5))
+// M = hypermat([2 3 2 2],uint32(1:24))
+// [x, y] = callJulia('divrem', M, uint32(5))
+
+// test for strings
+callJulia('string', "This is", " cool")
+callJulia('*', "This is", " cool", ".\n")
+// callJulia('string', ["This is", "This is", "This is"], " cool")

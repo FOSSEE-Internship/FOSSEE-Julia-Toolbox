@@ -28,7 +28,7 @@ int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
 
         if (isHypermatType(pvApiCtx, piAddressVar)) {
             
-            sciprint("double_sci_to_jl: Hypermat Double\n");
+            sciprint("bool_sci_to_jl: Hypermat Boolean\n");
 
             sciErr = getHypermatOfBoolean(pvApiCtx, piAddressVar, &dims, &ndims, &data);
             if (sciErr.iErr)
@@ -53,7 +53,7 @@ int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             dims[1] = n;
         }
 
-        sciprint("double_sci_to_jl: size: (");
+        sciprint("bool_sci_to_jl: size: (");
         for(int i = 0; i != ndims; i++) {
             len *= dims[i];
             sciprint("%d", dims[i]);
