@@ -183,12 +183,15 @@ int int_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             types[i] = (jl_value_t*)jl_long_type;
 
         jl_tupletype_t *tt = jl_apply_tuple_type_v(types, ndims);
-        typedef struct {
-            ssize_t a[ndims];
-        } ntupleint;
+        // typedef struct {
+        //     ssize_t a[ndims];
+        // } ntupleint;
         
-        ntupleint *tuple = (ntupleint*)jl_new_struct_uninit(tt);
+        ssize_t *tuple = (ssize_t*)jl_new_struct_uninit(tt);
         JL_GC_PUSH1(&tuple);
+
+        for (int i = 0; i != ndims; i++)
+            (tuple)[i] = dims[i];
 
         jl_value_t *array_type;
         
@@ -215,8 +218,6 @@ int int_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             }
         }
 
-        for (int i = 0; i != ndims; i++)
-            (tuple->a)[i] = dims[i];
 
         *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
         JL_GC_POP();
@@ -326,6 +327,17 @@ int int_jl_to_sci(jl_value_t *input, int position) {
                 else 
                     sciErr = createHypermatOfInteger32(pvApiCtx, position, dims, ndims, data);
             }
+            else if(jl_typeis(input, jl_apply_array_type(jl_int64_type, ndims))) {
+                int32_t *data = (int32_t*) jl_array_data(matrix);
+                if (jl_exception_occurred())
+                    sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
+
+                sciprint("int_jl_to_sci: int64 overflow expected\n");
+                if(ndims == 2)
+                    sciErr = createMatrixOfInteger32(pvApiCtx, position, dims[0], dims[1], data);
+                else 
+                    sciErr = createHypermatOfInteger32(pvApiCtx, position, dims, ndims, data);
+            }
             else if(jl_typeis(input, jl_apply_array_type(jl_uint8_type, ndims))) {
                 uint8_t *data = (uint8_t*) jl_array_data(matrix);
                 if (jl_exception_occurred())
@@ -356,8 +368,19 @@ int int_jl_to_sci(jl_value_t *input, int position) {
                 else 
                     sciErr = createHypermatOfUnsignedInteger32(pvApiCtx, position, dims, ndims, data);
             }
+            else if(jl_typeis(input, jl_apply_array_type(jl_uint64_type, ndims))) {
+                uint32_t *data = (uint32_t*) jl_array_data(matrix);
+                if (jl_exception_occurred())
+                    sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
+                
+                sciprint("int_jl_to_sci: uint64 overflow expected\n");
+                if(ndims == 2)
+                    sciErr = createMatrixOfUnsignedInteger32(pvApiCtx, position, dims[0], dims[1], data);
+                else 
+                    sciErr = createHypermatOfUnsignedInteger32(pvApiCtx, position, dims, ndims, data);
+            }
             else {
-                Scierror(999, "integer_conv: not a correct integer variable");
+                Scierror(999, "integer_conv: not a correct integer variable\n");
                 return 0;
             }
 
@@ -370,7 +393,7 @@ int int_jl_to_sci(jl_value_t *input, int position) {
     }
 
     if (err) {
-        Scierror(999, "interger_conv: error in conversion");
+        Scierror(999, "interger_conv: error in conversion\n");
         return 0;
     }
 

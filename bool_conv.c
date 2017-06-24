@@ -75,15 +75,15 @@ int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             types[i] = (jl_value_t*)jl_long_type;
 
         jl_tupletype_t *tt = jl_apply_tuple_type_v(types, ndims);
-        typedef struct {
-            ssize_t a[ndims];
-        } ntupleint;
+        // typedef struct {
+        //     ssize_t a[ndims];
+        // } ntupleint;
         
-        ntupleint *tuple = (ntupleint*)jl_new_struct_uninit(tt);
+        ssize_t *tuple = (ssize_t*)jl_new_struct_uninit(tt);
         JL_GC_PUSH1(&tuple);
 
         for (int i = 0; i != ndims; i++)
-            (tuple->a)[i] = dims[i];
+            (tuple)[i] = dims[i];
 
         *ret = (jl_value_t*) jl_ptr_to_array(array_type, xData, (jl_value_t*)tuple, 0);
         JL_GC_POP();

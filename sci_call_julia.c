@@ -14,6 +14,7 @@ extern int bool_jl_to_sci(jl_value_t *input, int position);
 extern int string_sci_to_jl(int *piAddressVar, jl_value_t **ret);
 extern int string_jl_to_sci(jl_value_t *input, int position);
 
+
 int sci_init_julia(char* fname, unsigned long fname_len) {
     
     ////////// Julia Init Code //////////
@@ -242,6 +243,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 return 0;
             }
 
+
             sciprint("%s: assigning output variable #%d\n", fname, i + 1);
             AssignOutputVariable(pvApiCtx, i + 1) = nbInputArgument(pvApiCtx) + i + 1;
         }
@@ -251,7 +253,8 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         if(jl_is_array(ret)) {
             int ndims = jl_array_ndims(ret);
 
-            if (jl_typeis(ret, jl_apply_array_type(jl_float64_type, ndims))) {
+            if (jl_typeis(ret, jl_apply_array_type(jl_float64_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type(jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims)) ) {
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
@@ -278,7 +281,8 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             }
         }
         else {
-            if(jl_typeis(ret, jl_float64_type)) {
+            if(jl_typeis(ret, jl_float64_type) || 
+                jl_typeis(ret, jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)))) {
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
@@ -304,7 +308,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 err = string_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
             else {
-                jl_value_t *var_type = jl_typeof(ret);
+                sciprint("%s: %s variable\n", functionName, jl_typeof_str(ret));
 
                 JL_GC_POP();
                 Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);

@@ -2,21 +2,53 @@
 #include <julia.h>
 #include "Scierror.h"
 
+#include <complex.h>
+
+// #ifdef _P64
+// #define jint int64_t
+// #define PRIjint PRId64
+// #else
+// #define jint int32_t
+// #define PRIjint PRId32
+// #endif
+
+// // Complex-like data types
+// typedef struct {
+//     jint real;
+//     jint imag;
+// } complex_t;
+
 int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
     // Error management variable
     SciErr sciErr;
     int err;
 
     if(isScalar(pvApiCtx, piAddressVar)){
-        sciprint("double_sci_to_jl: Scalar Double\n");
-        double data;
-        err = getScalarDouble(pvApiCtx, piAddressVar, &data);
-        if (err)
-        {
-            return 0;
+        double data, img_data;
+        if (isVarComplex(pvApiCtx, piAddressVar)) { 
+            sciprint("double_sci_to_jl: Scalar Complex Double\n");
+            err = getScalarComplexDouble(pvApiCtx, piAddressVar, &data, &img_data);
+            if (err)
+            {
+                return 0;
+            }
+
+            jl_value_t *scalar_type = jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type));
+            *ret = (jl_value_t*)jl_new_struct_uninit(scalar_type);
+    
+            double complex *temp = (double complex*) *ret;
+            *temp = data + (img_data * I);
+        }
+        else {
+            sciprint("double_sci_to_jl: Scalar Double\n");
+            err = getScalarDouble(pvApiCtx, piAddressVar, &data);
+            if (err)
+            {
+                return 0;
+            }   
+            *ret = jl_box_float64(data);
         }
 
-        *ret = jl_box_float64(data);
     }
     else { 
         int ndims = 0;
@@ -80,16 +112,16 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             types[i] = (jl_value_t*)jl_long_type;
 
         jl_tupletype_t *tt = jl_apply_tuple_type_v(types, ndims);
-        typedef struct {
-            ssize_t a[ndims];
-        } ntupleint;
+        // typedef struct {
+        //     ssize_t a[ndims];
+        // } ntupleint;
         
-        ntupleint *tuple = (ntupleint*)jl_new_struct_uninit(tt);
+        ssize_t *tuple = (ssize_t*)jl_new_struct_uninit(tt);
         JL_GC_PUSH1(&tuple);
 
         
         for (int i = 0; i != ndims; i++)
-            (tuple->a)[i] = dims[i];
+            (tuple)[i] = dims[i];
 
         
 
@@ -164,6 +196,15 @@ int double_jl_to_sci(jl_value_t *input, int position) {
         double data = jl_unbox_float64(input);
         sciprint("data: %f\n", data);
         err = createScalarDouble(pvApiCtx, position, data);
+        if (err) {
+            return 0;
+        }
+    }
+    else if (jl_typeis(input, jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)))) {
+        complex double *data = input;
+        double real = creal(*data);
+        double imag = cimag(*data);
+        err = createScalarComplexDouble(pvApiCtx, position, real, imag);
         if (err) {
             return 0;
         }
