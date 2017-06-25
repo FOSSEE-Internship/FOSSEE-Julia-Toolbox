@@ -25,12 +25,48 @@ int string_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         int *dims;
 
         char **data;
-        int stringLengths;
+        int *strLen;
+        int len;
         
         if (isHypermatType(pvApiCtx, piAddressVar)) {    
             sciprint("string_sci_to_jl: Hypermat String\n");
+            // getting data from Scilab
+            //first call to retrieve dimensions
+            sciErr = getHypermatOfString(pvApiCtx, piAddressVar, &dims, &ndims, NULL, NULL);
+            if (sciErr.iErr)
+            {
+                printError(&sciErr, 0);
+                return 0;
+            }
 
-            sciErr = getHypermatOfString(pvApiCtx, piAddressVar, &dims, &ndims, &stringLengths, &data);
+            len = 1;
+            sciprint("string_sci_to_jl: size: (");
+            for(int i = 0; i != ndims; i++) {
+                len *= dims[i];
+                sciprint("%d", dims[i]);
+                if (i != ndims - 1) 
+                    sciprint(", ");
+            }
+            sciprint(")\n");
+
+            strLen = (int*)malloc(sizeof(int) * len);
+
+            //second call to retrieve length of each string
+            sciErr = getHypermatOfString(pvApiCtx, piAddressVar, &dims, &ndims, strLen, NULL);
+            if (sciErr.iErr)
+            {
+                printError(&sciErr, 0);
+                return 0;
+            }
+
+            data = (char**)malloc(sizeof(char*) * len);
+            for(int i = 0 ; i < len ; i++)
+            {
+                data[i] = (char*)malloc(sizeof(char) * (strLen[i] + 1));//+ 1 for null termination
+            }
+
+            //third call to retrieve data
+            sciErr = getHypermatOfString(pvApiCtx, piAddressVar, &dims, &ndims, strLen, data);
             if (sciErr.iErr)
             {
                 printError(&sciErr, 0);
@@ -41,7 +77,6 @@ int string_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             sciprint("string_sci_to_jl: Matrix String\n");
             
             int m, n;
-            int *strLen;
 
             // getting data from Scilab
 
@@ -78,29 +113,24 @@ int string_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             }
 
 
-            // err = getAllocatedMatrixOfString(pvApiCtx, piAddressVar, &m, &n, &data);
-            // if (err == 0)
-            // {
-            //     sciprint("string_sci_to_jl: couldn't get strings from scilab\n");
-            //     return 0;
-            // }
-
             ndims = 2;
             dims = xdims;
 
             dims[0] = m;
             dims[1] = n;
+
+            len = 1;
+            sciprint("string_sci_to_jl: size: (");
+            for(int i = 0; i != ndims; i++) {
+                len *= dims[i];
+                sciprint("%d", dims[i]);
+                if (i != ndims - 1) 
+                    sciprint(", ");
+            }
+            sciprint(")\n");
         }
 
-        int len = 1;
-        sciprint("string_sci_to_jl: size: (");
-        for(int i = 0; i != ndims; i++) {
-            len *= dims[i];
-            sciprint("%d", dims[i]);
-            if (i != ndims - 1) 
-                sciprint(", ");
-        }
-        sciprint(")\n");
+        
 
         jl_value_t *array_type = jl_apply_array_type(jl_string_type, ndims);
 
@@ -128,14 +158,16 @@ int string_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         for (int i = 0; i != ndims; i++)
             (tuple)[i] = dims[i];
 
-        
-        *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
+        *ret = (jl_value_t*) jl_new_array(array_type, (jl_value_t*)tuple);
         JL_GC_POP();
 
-        char **xData = (char **) jl_array_data(*ret);
 
-        for (int i = 0; i != len; i++)
-            sciprint("%s\n", xData[i]);
+        jl_value_t **xData = (jl_value_t **) jl_array_data(*ret);
+        for (int i = 0; i != len; i++) {
+            xData[i] = (jl_value_t*) jl_cstr_to_string(data[i]);
+        }
+        // for (int i = 0; i != len; i++)
+        //     sciprint("%s\n", jl_string_data(xData[i]));
     }
 
 
@@ -166,10 +198,16 @@ int string_jl_to_sci(jl_value_t *input, int position) {
             
             sciprint("string_jl_to_sci: argument #%d: Matrix String\n", position);
 
-            data = (char**) jl_array_data(matrix);
+            jl_value_t **xData = (jl_value_t**) jl_array_data(matrix);
+            
             if (jl_exception_occurred())
                 sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
 
+            data = (char **) malloc(sizeof(char*) * len);
+
+            for (int i = 0; i != len; i++) {
+                data[i] = jl_string_data(xData[i]);
+            }
 
             sciprint("size: (");
             for (int i = 0; i != ndims; i++){
@@ -188,11 +226,15 @@ int string_jl_to_sci(jl_value_t *input, int position) {
             else {
                 sciErr = createHypermatOfString(pvApiCtx, position, dims, ndims, data);
             }
+
+            free(data);
+            
             if (sciErr.iErr)
             {
                 printError(&sciErr, 0);
                 return 0;
             }
+
         }
     }
     else if(jl_typeis(input, jl_string_type)){

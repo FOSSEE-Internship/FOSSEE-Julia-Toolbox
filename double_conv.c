@@ -34,7 +34,7 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             }
 
             jl_value_t *scalar_type = jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type));
-            *ret = (jl_value_t*)jl_new_struct_uninit(scalar_type);
+            *ret = (jl_value_t*)jl_new_struct_uninit((jl_datatype_t *)scalar_type);
     
             double complex *temp = (double complex*) *ret;
             *temp = data + (img_data * I);
@@ -56,82 +56,153 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         int xdims[2];
         int *dims;
 
-        double *data;
-        
-        if (isHypermatType(pvApiCtx, piAddressVar)) {    
-            sciprint("double_sci_to_jl: Hypermat Double\n");
+        if (isVarComplex(pvApiCtx, piAddressVar)) {
+            double *real, *imag;
+            if (isHypermatComplex(pvApiCtx, piAddressVar)) {    
+                sciprint("double_sci_to_jl: Hypermat Complex Double\n");
 
-            sciErr = getHypermatOfDouble(pvApiCtx, piAddressVar, &dims, &ndims, &data);
-            if (sciErr.iErr)
-            {
-                printError(&sciErr, 0);
-                return 0;
+                sciErr = getComplexHypermatOfDouble(pvApiCtx, piAddressVar, &dims, &ndims, &real, &imag);
+                if (sciErr.iErr)
+                {
+                    printError(&sciErr, 0);
+                    return 0;
+                }
             }
+            else {
+                sciprint("double_sci_to_jl: Matrix Complex Double\n");
+                
+                int m, n;
+                // getting data from Scilab
+                sciErr = getComplexMatrixOfDouble(pvApiCtx, piAddressVar, &m, &n, &real, &imag);
+                if (sciErr.iErr)
+                {
+                    printError(&sciErr, 0);
+                    return 0;
+                }
+                ndims = 2;
+                dims = xdims;
+
+                dims[0] = m;
+                dims[1] = n;
+            }
+
+            int len = 1;
+            sciprint("double_sci_to_jl: size: (");
+            for(int i = 0; i != ndims; i++) {
+                len *= dims[i];
+                sciprint("%d", dims[i]);
+                if (i != ndims - 1) 
+                    sciprint(", ");
+            }
+            sciprint(")\n");
+
+            jl_value_t *array_type = jl_apply_array_type((jl_datatype_t *)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims);
+            jl_value_t *types[ndims];
+
+            for (int i = 0; i != ndims; i++)
+                types[i] = (jl_value_t*)jl_long_type;
+
+            jl_tupletype_t *tt = jl_apply_tuple_type_v(types, ndims);
+
+            ssize_t *tuple = (ssize_t*)jl_new_struct_uninit(tt);
+            JL_GC_PUSH1(&tuple);
+
+            
+            for (int i = 0; i != ndims; i++)
+                (tuple)[i] = dims[i];
+
+            complex double **data;
+            data = (complex double **) malloc(len * sizeof(complex double *));
+            for (int i = 0; i != len; i++) {
+                data[i] = (complex double *) malloc(sizeof(complex double));
+                *(data[i]) = real[i] + imag[i] * I;
+            }
+
+            *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
+            JL_GC_POP();
+
+            complex double **xData = (complex double**) jl_array_data(*ret);
+
+            for (int i = 0; i != len; i++)
+                sciprint("%f + %fi\n", creal(*xData[i]), cimag(*xData[i]));
         }
         else {
-            sciprint("double_sci_to_jl: Matrix Double\n");
-            
-            int m, n;
+            double *data;
+            if (isHypermatType(pvApiCtx, piAddressVar)) {    
+                sciprint("double_sci_to_jl: Hypermat Double\n");
 
-            // getting data from Scilab
-            sciErr = getMatrixOfDouble(pvApiCtx, piAddressVar, &m, &n, &data);
-            if (sciErr.iErr)
-            {
-                printError(&sciErr, 0);
-                return 0;
+                sciErr = getHypermatOfDouble(pvApiCtx, piAddressVar, &dims, &ndims, &data);
+                if (sciErr.iErr)
+                {
+                    printError(&sciErr, 0);
+                    return 0;
+                }
             }
-            ndims = 2;
-            dims = xdims;
+            else {
+                sciprint("double_sci_to_jl: Matrix Double\n");
+                
+                int m, n;
 
-            dims[0] = m;
-            dims[1] = n;
+                // getting data from Scilab
+                sciErr = getMatrixOfDouble(pvApiCtx, piAddressVar, &m, &n, &data);
+                if (sciErr.iErr)
+                {
+                    printError(&sciErr, 0);
+                    return 0;
+                }
+                ndims = 2;
+                dims = xdims;
+
+                dims[0] = m;
+                dims[1] = n;
+            }
+
+            int len = 1;
+            sciprint("double_sci_to_jl: size: (");
+            for(int i = 0; i != ndims; i++) {
+                len *= dims[i];
+                sciprint("%d", dims[i]);
+                if (i != ndims - 1) 
+                    sciprint(", ");
+            }
+            sciprint(")\n");
+
+            jl_value_t *array_type = jl_apply_array_type(jl_float64_type, ndims);
+
+            // *ret = jl_alloc_array_2d(array_type, m, n);
+            // double *xData = (double*) jl_array_data(ret);
+
+            // for (int i = 0; i != m * n; i++) 
+            //     xData[i] = data[i];
+            
+
+
+            jl_value_t *types[ndims];
+            for (int i = 0; i != ndims; i++)
+                types[i] = (jl_value_t*)jl_long_type;
+
+            jl_tupletype_t *tt = jl_apply_tuple_type_v(types, ndims);
+            // typedef struct {
+            //     ssize_t a[ndims];
+            // } ntupleint;
+            
+            ssize_t *tuple = (ssize_t*)jl_new_struct_uninit(tt);
+            JL_GC_PUSH1(&tuple);
+
+            
+            for (int i = 0; i != ndims; i++)
+                (tuple)[i] = dims[i];
+
+            
+
+            *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
+            JL_GC_POP();
+
+            double *xData = (double*) jl_array_data(*ret);
+
+            for (int i = 0; i != len; i++)
+                sciprint("%f\n", xData[i]);
         }
-
-        int len = 1;
-        sciprint("double_sci_to_jl: size: (");
-        for(int i = 0; i != ndims; i++) {
-            len *= dims[i];
-            sciprint("%d", dims[i]);
-            if (i != ndims - 1) 
-                sciprint(", ");
-        }
-        sciprint(")\n");
-
-        jl_value_t *array_type = jl_apply_array_type(jl_float64_type, ndims);
-
-        // *ret = jl_alloc_array_2d(array_type, m, n);
-        // double *xData = (double*) jl_array_data(ret);
-
-        // for (int i = 0; i != m * n; i++) 
-        //     xData[i] = data[i];
-        
-
-
-        jl_value_t *types[ndims];
-        for (int i = 0; i != ndims; i++)
-            types[i] = (jl_value_t*)jl_long_type;
-
-        jl_tupletype_t *tt = jl_apply_tuple_type_v(types, ndims);
-        // typedef struct {
-        //     ssize_t a[ndims];
-        // } ntupleint;
-        
-        ssize_t *tuple = (ssize_t*)jl_new_struct_uninit(tt);
-        JL_GC_PUSH1(&tuple);
-
-        
-        for (int i = 0; i != ndims; i++)
-            (tuple)[i] = dims[i];
-
-        
-
-        *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
-        JL_GC_POP();
-
-        double *xData = (double*) jl_array_data(*ret);
-
-        for (int i = 0; i != len; i++)
-            sciprint("%f\n", xData[i]);
     }
 
 
@@ -153,28 +224,24 @@ int double_jl_to_sci(jl_value_t *input, int position) {
         
         // Get number of dimensions
         int ndims = jl_array_ndims(matrix);
-        
+        // Get the size of the matrix
+        int dims[ndims];
+        int len = jl_array_len(matrix);
+
+        sciprint("size: (");
+        for (int i = 0; i != ndims; i++){
+            dims[i] = jl_array_dim(matrix, i);
+            sciprint("%d, ", dims[i]);
+        }
+        sciprint(")\n");
+
         if(jl_typeis(matrix, jl_apply_array_type(jl_float64_type, ndims))) {
-            // Get the size of the matrix
-            int dims[ndims];
-            int len = jl_array_len(matrix);
             double *data;
-            
+
             sciprint("double_jl_to_sci: argument #%d: Matrix Double\n", position);
 
             data = (double*) jl_array_data(matrix);
-            if (jl_exception_occurred())
-                sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
-
-
-            sciprint("size: (");
-            for (int i = 0; i != ndims; i++){
-                dims[i] = jl_array_dim(matrix, i);
-                sciprint("%d, ", dims[i]);
-            }
-            sciprint(")\n");
             
-
             // for (int i = 0; i != len; i++)
             //     sciprint("%f\n", data[i]);
 
@@ -190,6 +257,50 @@ int double_jl_to_sci(jl_value_t *input, int position) {
                 return 0;
             }
         }
+        else if (jl_typeis(matrix, jl_apply_array_type((jl_datatype_t*)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims))) {
+            sciprint("double_jl_to_sci: argument #%d: Matrix Complex Double\n", position);
+            // jl_value_t **jl_data = jl_array_data(matrix);
+            complex double * data = (complex double *) jl_array_data(matrix);
+
+            // sciprint("double_jl_to_sci: %d: %s\n", position, jl_typeof_str());
+
+            double *real, *imag;
+            real = (double*) malloc(len * sizeof(double));
+            imag = (double*) malloc(len * sizeof(double));
+
+            // sciprint("%f\n", creal(data[0]));
+
+            for (int i = 0; i != len; i++) {
+                // double complex *temp = (double complex*) jl_data[i];
+                // sciprint("double_jl_to_sci: %d: %s\n", i, jl_typeof_str(jl_data[i]));
+                // real[i] = creal(*temp);
+                // imag[i] = cimag();
+                sciprint("%f ", creal(data[i]));
+                sciprint("%f\n", cimag(data[i]));
+                real[i] = creal(data[i]);
+                imag[i] = cimag(data[i]);
+            }
+
+            if (ndims == 2){
+                sciErr = createComplexMatrixOfDouble(pvApiCtx, position, dims[0], dims[1], real, imag);
+            }
+            else {
+                sciErr = createComplexHypermatOfDouble(pvApiCtx, position, dims, ndims, real, imag);
+            }
+            
+            free(real);
+            free(imag);
+
+            if (sciErr.iErr)
+            {
+                printError(&sciErr, 0);
+                return 0;
+            }
+        }
+
+        if (jl_exception_occurred())
+            sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
+
     }
     else if(jl_typeis(input, jl_float64_type)){
         sciprint("double_jl_to_sci: argument #%d: Scalar Double\n", position);
@@ -201,7 +312,7 @@ int double_jl_to_sci(jl_value_t *input, int position) {
         }
     }
     else if (jl_typeis(input, jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)))) {
-        complex double *data = input;
+        complex double *data = (complex double*) input;
         double real = creal(*data);
         double imag = cimag(*data);
         err = createScalarComplexDouble(pvApiCtx, position, real, imag);

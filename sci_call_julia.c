@@ -254,7 +254,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             int ndims = jl_array_ndims(ret);
 
             if (jl_typeis(ret, jl_apply_array_type(jl_float64_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims)) ) {
+                jl_typeis(ret, jl_apply_array_type((jl_datatype_t*)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims)) ) {
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
