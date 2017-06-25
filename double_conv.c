@@ -102,19 +102,18 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             *ret = (jl_value_t*) jl_new_array(array_type, (jl_value_t*)tuple);
             JL_GC_POP();
             
-            jl_value_t **data = (jl_value_t**) jl_array_data(*ret);
-            double complex *temp;
+            double complex *data = (double complex*) jl_array_data(*ret);
             for (int i = 0; i != len; i++) {
-                data[i] = (jl_value_t*)jl_new_struct_uninit((jl_datatype_t *)array_element_type);
-                temp = (double complex*) data[i];
-                *temp = 1 + 0 * I;
+                sciprint("double_sci_to_jl: %d\n", data);
+                // data[i] = (jl_value_t*)jl_new_struct_uninit((jl_datatype_t *)array_element_type);
+                data[i] = real[i] + imag[i] * I;
             }
 
             // *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
 
-            complex double **xData = (complex double**) jl_array_data(*ret);
+            complex double *xData = (complex double*) jl_array_data(*ret);
             for (int i = 0; i != len; i++)
-                sciprint("%f + %fi\n", creal(*xData[i]), cimag(*xData[i]));
+                sciprint("%f + %fi\n", creal(xData[i]), cimag(xData[i]));
         }
         else {
             double *data;
@@ -249,7 +248,7 @@ int double_jl_to_sci(jl_value_t *input, int position) {
         }
         else if (jl_typeis(matrix, jl_apply_array_type((jl_datatype_t*)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims))) {
             sciprint("double_jl_to_sci: argument #%d: Matrix Complex Double\n", position);
-            jl_value_t **jl_data = (jl_value_t **) jl_array_data(matrix);
+            double complex *jl_data = (double complex *) jl_array_data(matrix);
             // double complex ** data = (double complex **) jl_array_data(matrix);
 
             // sciprint("double_jl_to_sci: %d: %s\n", position, jl_typeof_str());
@@ -261,10 +260,10 @@ int double_jl_to_sci(jl_value_t *input, int position) {
             // sciprint("%f\n", creal(data[0]));
 
             for (int i = 0; i != len; i++) {
-                double complex *temp = (double complex*) jl_data[i];
-                sciprint("double_jl_to_sci: %d: %s\n", i, jl_typeof_str(jl_data[i]));
-                // real[i] = creal(*temp);
-                // imag[i] = cimag(*temp);
+                double complex temp = jl_data[i];
+                // sciprint("double_jl_to_sci: %d: %s\n", i, jl_typeof_str(jl_data[i]));
+                real[i] = creal(temp);
+                imag[i] = cimag(temp);
                 // sciprint("%f ", creal(*data[i]));
                 // sciprint("%f\n", cimag(*data[i]));
                 // real[i] = creal(*data[i]);

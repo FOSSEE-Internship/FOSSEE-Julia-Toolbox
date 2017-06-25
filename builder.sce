@@ -6,35 +6,30 @@ function builder_gw_cpp()
 
 	root = get_absolute_file_path('builder.sce')
 	third_party_dir = root + 'thirdparty'
+	
+	julia_dir = third_party_dir + '/' + getos() + '/julia'
+	julialibpath = julia_dir + '/lib/'
 
 	// Loading dependencies 
 	if getos() == 'Windows' then 
 		disp("Not yet implemented for Windows")
 		return;
 	elseif getos() == 'Darwin' then
-		julia_dir = third_party_dir + '/darwin/julia'
-		julialibpath = julia_dir + '/lib/'
-
-		setenv('LD_LIBRARY_PATH', third_party_dir + '/darwin/julia/lib/julia:' + getenv('LD_LIBRARY_PATH'))
-		setenv('DYLD_LIBRARY_PATH', third_party_dir + '/darwin/julia/lib/julia:' + getenv('DYLD_LIBRARY_PATH'))
-
-		// link(julialibpath + 'julia/libstdc++' + getdynlibext() + '.6')
-		link(julialibpath + 'libjulia' + getdynlibext())
+		// setenv('LD_LIBRARY_PATH', third_party_dir + '/darwin/julia/lib/julia:' + getenv('LD_LIBRARY_PATH'))
+		// setenv('DYLD_LIBRARY_PATH', third_party_dir + '/darwin/julia/lib/julia:' + getenv('DYLD_LIBRARY_PATH'))
+		include = "-g -DJULIA_ENABLE_THREADING=1 -fPIC -DJULIA_INIT_DIR=" + julia_dir + "/lib -I" + julia_dir + "/include/julia"
+		ldflag = "-L" + julialibpath + " -Wl,-rpath," + julialibpath + " -ljulia"
+		link(julialibpath + 'julia/libcurl.5' + getdynlibext())
 	elseif getos() == 'Linux' then
-		julia_dir = third_party_dir + '/linux/julia'
-		julialibpath = julia_dir + '/lib/'
-
-		// link(julialibpath + 'julia/libstdc++' + getdynlibext() + '.6')
-		// link(julialibpath + 'libjulia' + getdynlibext())
+		include = '-g -I/home/harshith/scilab-5.5.2/include -I' + julia_dir + '/include/julia -DJULIA_ENABLE_THREADING'
+		ldflag = '-L' + julia_dir + '/lib/julia -L' + julialibpath + ' -Wl,--verbose -Wl,-rpath,' + julialibpath + ' -Wl,-Bstatic -ljulia' 
 	end
 
 
 	setenv('JULIA_DIR', julia_dir)
 	setenv('JULIA_HOME', julia_dir + '/bin')
 
-	include = '-g -I/home/harshith/scilab-5.5.2/include -I' + julia_dir + '/include/julia -DJULIA_ENABLE_THREADING'
-	ldflag = '-L' + julia_dir + '/lib/julia -L' + julialibpath + ' -Wl,--verbose -Wl,-rpath,' + julialibpath + ' -Wl,-Bstatic -ljulia' 
-	ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], files, [julialibpath + 'libjulia'], [], ldflag, include);
+	ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'evalJulia', 'sci_eval_julia'; 'exitJulia', 'sci_exit_julia'], files, [julialibpath + 'libjulia'], [], ldflag, include);
 	// ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], files, [], [], ldflag, include);
 
 	// setenv('LD_LIBRARY_PATH', third_party_dir + '/linux/julia/lib/julia:' + third_party_dir + '/linux/julia/lib:' + getenv('LD_LIBRARY_PATH'))

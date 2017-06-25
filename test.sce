@@ -1,6 +1,3 @@
-
-
-
 // // test for hypermat
 // M = hypermat([2 3 2 2],[%T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F])
 // callJulia('+', M, M)
@@ -37,4 +34,6 @@
 
 // complex
 n = [2 + %i, 23.3]
-callJulia('string', n, n)
+// n = 2 + %i
+callJulia('+', n, n)
+[s, b] = evalJulia('([2 * im, 2.3 + 3*im], [2 * im, 2.433 + 3*im])')

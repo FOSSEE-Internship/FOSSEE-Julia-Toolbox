@@ -221,10 +221,10 @@ int string_jl_to_sci(jl_value_t *input, int position) {
             //     sciprint("%f\n", data[i]);
 
             if (ndims == 2){
-                sciErr = createMatrixOfString(pvApiCtx, position, dims[0], dims[1], data);
+                sciErr = createMatrixOfString(pvApiCtx, position, dims[0], dims[1], (const char *const *)data);
             }
             else {
-                sciErr = createHypermatOfString(pvApiCtx, position, dims, ndims, data);
+                sciErr = createHypermatOfString(pvApiCtx, position, dims, ndims, (const char* const*)data);
             }
 
             free(data);
