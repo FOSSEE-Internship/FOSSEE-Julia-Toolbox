@@ -4,19 +4,6 @@
 
 #include <complex.h>
 
-// #ifdef _P64
-// #define jint int64_t
-// #define PRIjint PRId64
-// #else
-// #define jint int32_t
-// #define PRIjint PRId32
-// #endif
-
-// // Complex-like data types
-// typedef struct {
-//     jint real;
-//     jint imag;
-// } complex_t;
 
 int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
     // Error management variable
@@ -96,9 +83,10 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             }
             sciprint(")\n");
 
-            jl_value_t *array_type = jl_apply_array_type((jl_datatype_t *)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims);
+            jl_value_t *array_element_type = jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type));
+            jl_value_t *array_type = jl_apply_array_type((jl_datatype_t *)array_element_type, ndims);
+            
             jl_value_t *types[ndims];
-
             for (int i = 0; i != ndims; i++)
                 types[i] = (jl_value_t*)jl_long_type;
 
@@ -111,18 +99,20 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             for (int i = 0; i != ndims; i++)
                 (tuple)[i] = dims[i];
 
-            complex double **data;
-            data = (complex double **) malloc(len * sizeof(complex double *));
+            *ret = (jl_value_t*) jl_new_array(array_type, (jl_value_t*)tuple);
+            JL_GC_POP();
+            
+            jl_value_t **data = (jl_value_t**) jl_array_data(*ret);
+            double complex *temp;
             for (int i = 0; i != len; i++) {
-                data[i] = (complex double *) malloc(sizeof(complex double));
-                *(data[i]) = real[i] + imag[i] * I;
+                data[i] = (jl_value_t*)jl_new_struct_uninit((jl_datatype_t *)array_element_type);
+                temp = (double complex*) data[i];
+                *temp = 1 + 0 * I;
             }
 
-            *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
-            JL_GC_POP();
+            // *ret = (jl_value_t*) jl_ptr_to_array(array_type, data, (jl_value_t*)tuple, 0);
 
             complex double **xData = (complex double**) jl_array_data(*ret);
-
             for (int i = 0; i != len; i++)
                 sciprint("%f + %fi\n", creal(*xData[i]), cimag(*xData[i]));
         }
@@ -259,8 +249,8 @@ int double_jl_to_sci(jl_value_t *input, int position) {
         }
         else if (jl_typeis(matrix, jl_apply_array_type((jl_datatype_t*)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims))) {
             sciprint("double_jl_to_sci: argument #%d: Matrix Complex Double\n", position);
-            // jl_value_t **jl_data = jl_array_data(matrix);
-            complex double * data = (complex double *) jl_array_data(matrix);
+            jl_value_t **jl_data = (jl_value_t **) jl_array_data(matrix);
+            // double complex ** data = (double complex **) jl_array_data(matrix);
 
             // sciprint("double_jl_to_sci: %d: %s\n", position, jl_typeof_str());
 
@@ -271,14 +261,14 @@ int double_jl_to_sci(jl_value_t *input, int position) {
             // sciprint("%f\n", creal(data[0]));
 
             for (int i = 0; i != len; i++) {
-                // double complex *temp = (double complex*) jl_data[i];
-                // sciprint("double_jl_to_sci: %d: %s\n", i, jl_typeof_str(jl_data[i]));
+                double complex *temp = (double complex*) jl_data[i];
+                sciprint("double_jl_to_sci: %d: %s\n", i, jl_typeof_str(jl_data[i]));
                 // real[i] = creal(*temp);
-                // imag[i] = cimag();
-                sciprint("%f ", creal(data[i]));
-                sciprint("%f\n", cimag(data[i]));
-                real[i] = creal(data[i]);
-                imag[i] = cimag(data[i]);
+                // imag[i] = cimag(*temp);
+                // sciprint("%f ", creal(*data[i]));
+                // sciprint("%f\n", cimag(*data[i]));
+                // real[i] = creal(*data[i]);
+                // imag[i] = cimag(*data[i]);
             }
 
             if (ndims == 2){

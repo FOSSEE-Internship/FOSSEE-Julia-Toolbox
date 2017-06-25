@@ -28,13 +28,13 @@
 // M = hypermat([2 3 2 2],uint32(1:24))
 // [x, y] = callJulia('divrem', M, uint32(5))
 
+// // test for strings
+// callJulia('string', "This is", " cool")
+// callJulia('*', "This is", " cool", ".\n")
+// a = callJulia('string', ["This is", "This is", "This is"], " cool")
+// M = hypermat([2 3 2 2], ["Yeah!", "Yeah!", "Yeah!", "No!!", "Yeah!", "No!!", "Yeah!", "Yeah!", "Yeah!", "No!!", "Yeah!", "No!!", "Yeah!", "Yeah!", "Yeah!", "No!!", "Yeah!", "No!!", "Yeah!", "Yeah!", "Yeah!", "No!!", "Yeah!", "No!!"])
+// b = callJulia('copy', M)
+
 // complex
 n = [2 + %i, 23.3]
-callJulia('+', n, n)
-
-// // test for strings
-callJulia('string', "This is", " cool")
-callJulia('*', "This is", " cool", ".\n")
-a = callJulia('string', ["This is", "This is", "This is"], " cool")
-M = hypermat([2 3 2 2], ["Yeah!", "Yeah!", "Yeah!", "No!!", "Yeah!", "No!!", "Yeah!", "Yeah!", "Yeah!", "No!!", "Yeah!", "No!!", "Yeah!", "Yeah!", "Yeah!", "No!!", "Yeah!", "No!!", "Yeah!", "Yeah!", "Yeah!", "No!!", "Yeah!", "No!!"])
-b = callJulia('copy', M)
+callJulia('string', n, n)
