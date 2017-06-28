@@ -33,7 +33,11 @@
 // b = callJulia('copy', M)
 
 // complex
-n = [2 + %i, 23.3]
+// n = [2 + %i, 23.3, 0]
 // n = 2 + %i
-callJulia('+', n, n)
-[s, b] = evalJulia('([2 * im, 2.3 + 3*im], [2 * im, 2.433 + 3*im])')
+// [s, b] = evalJulia('([2 * im, 2.3 + 3*im], [2 * im, 2.433 + 3*im])')
+
+// sparse
+n = [0, 4325; 23, 0; 0, 0; 245, 2352]
+callJulia('full', sparse(n)')
+

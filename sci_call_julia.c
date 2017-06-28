@@ -1,6 +1,7 @@
 #include "api_scilab.h"
 #include <julia.h>
 #include "Scierror.h"
+#include <string.h>
 
 extern int double_sci_to_jl(int *piAddressVar, jl_value_t **ret);
 extern int double_jl_to_sci(jl_value_t *input, int position);
@@ -14,6 +15,7 @@ extern int bool_jl_to_sci(jl_value_t *input, int position);
 extern int string_sci_to_jl(int *piAddressVar, jl_value_t **ret);
 extern int string_jl_to_sci(jl_value_t *input, int position);
 
+extern int sparse_sci_to_jl(int *piAddressVar, jl_value_t **ret);
 
 int sci_init_julia(char* fname, unsigned long fname_len) {
     
@@ -219,7 +221,7 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
             }
             else {
                 sciprint("%s: %s variable\n", fname, jl_typeof_str(ret));
-
+                if (strcmp(jl_typeof_str(ret), "") )
                 JL_GC_POP();
                 Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
                 return 0;
@@ -353,6 +355,13 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 default:
                     break;
             }
+        }
+        else if(isSparseType(pvApiCtx, piAddressVar)) {
+            sciprint("%s: argument #%d: Sparse variable\n", fname, i + 1);
+            err = sparse_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
+
+            // Scierror(999, "%s: argument #%d not implemented yet\n", fname, i + 1);
+            // return 0;
         }
         else {
             Scierror(999, "%s: argument #%d not implemented yet\n", fname, i + 1);
@@ -522,7 +531,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             }
             else {
                 sciprint("%s: %s variable\n", functionName, jl_typeof_str(ret));
-
+                // if (jl_typeis(ret, ))
                 JL_GC_POP();
                 Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
                 return 0;

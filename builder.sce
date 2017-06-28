@@ -2,7 +2,7 @@ function builder_gw_cpp()
 	// This file is released under the 3-clause BSD license. See COPYING-BSD.
 	
 	// files = ['sci_call_julia.c', 'double_conv.c']
-	files = ['sci_call_julia.c', 'double_conv.c', 'integer_conv.c', 'bool_conv.c', 'string_conv.c']
+	files = ['sci_call_julia.c', 'double_conv.c', 'integer_conv.c', 'bool_conv.c', 'string_conv.c', 'sparse_conv.c']
 
 	root = get_absolute_file_path('builder.sce')
 	third_party_dir = root + 'thirdparty'
@@ -15,8 +15,6 @@ function builder_gw_cpp()
 		disp("Not yet implemented for Windows")
 		return;
 	elseif getos() == 'Darwin' then
-		// setenv('LD_LIBRARY_PATH', third_party_dir + '/darwin/julia/lib/julia:' + getenv('LD_LIBRARY_PATH'))
-		// setenv('DYLD_LIBRARY_PATH', third_party_dir + '/darwin/julia/lib/julia:' + getenv('DYLD_LIBRARY_PATH'))
 		include = "-g -DJULIA_ENABLE_THREADING=1 -fPIC -DJULIA_INIT_DIR=" + julia_dir + "/lib -I" + julia_dir + "/include/julia"
 		ldflag = "-L" + julialibpath + " -Wl,-rpath," + julialibpath + " -ljulia"
 		link(julialibpath + 'julia/libcurl.5' + getdynlibext())
