@@ -39,7 +39,7 @@ int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         }
         else {
             int m, n;
-            sciprint("bool_sci_to_jl: matrix boolean argument");
+            sciprint("bool_sci_to_jl: matrix boolean argument\n");
             sciErr = getMatrixOfBoolean(pvApiCtx, piAddressVar, &m, &n, &data);
             if (sciErr.iErr)
             {
@@ -104,15 +104,19 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
     // Error management
     SciErr sciErr;
     int err;
-    if (jl_is_array(input)) {
-        jl_array_t *matrix = (jl_array_t *) input;
-        
-        // Get number of dimensions
-        int ndims = jl_array_ndims(matrix);
+    if (jl_is_array(input) || jl_isa(input, jl_get_global(jl_base_module, jl_symbol("BitArray")))) {
+        int ndims;
+        int *dims;
+        int *data;
 
-        if (jl_typeis(matrix, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims))) {
+        if (jl_is_array(input)) { 
+            jl_array_t *matrix = (jl_array_t *) input;
+            
+            // Get number of dimensions
+            int ndims = jl_array_ndims(matrix);
+
             // Get the size of the matrix
-            int dims[ndims];
+            dims = (int*)malloc(ndims * sizeof(int));
             int len = jl_array_len(matrix);
 
             sciprint("%d \n", matrix);
@@ -120,7 +124,7 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
             sciprint("bool_jl_to_sci: matrix boolean output\n");
 
             // data from the 
-            int8_t *data = (int8_t*) jl_array_data(matrix);
+            int8_t *zData = (int8_t*) jl_array_data(matrix);
             if (jl_exception_occurred())
                 sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
 
@@ -131,26 +135,59 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
             }
             sciprint(")\n");
 
-            int *xData = malloc(len * sizeof(int));
+            data = malloc(len * sizeof(int));
             for (int i = 0; i != len; i++) {
-                xData[i] = data[i];
-                // if (data[i] == 1) 
-                //     xData[i] = 1; 
+                data[i] = zData[i];
+                // if (zData[i] == 1) 
+                //     data[i] = 1; 
                 // else 
-                //     xData[i] = 0; 
-                // sciprint("%d: before: %d, after: %d\n", i, data[i], xData[i]);
+                //     data[i] = 0; 
+                // sciprint("%d: before: %d, after: %d\n", i, zData[i], data[i]);
+            }
+        }
+        else if (jl_isa(input, jl_get_global(jl_base_module, jl_symbol("BitArray")))) {
+            typedef struct {
+                jl_array_t *chunks;
+                int64_t len;
+                jl_value_t *dims; 
+            } jl_bit_array_t;
+
+            jl_bit_array_t *ret = (jl_bit_array_t*) input;
+
+            int64_t len = ret->len;
+            sciprint("%s: BitArray \n", "bool_jl_to_sci");
+            uint64_t *zData = (uint64_t*) jl_array_data(ret->chunks);
+            jl_value_t *dimensions = ret->dims;
+
+            
+            ndims = jl_nfields(dimensions);
+
+            dims = (int*) malloc(ndims * sizeof(int));
+            for (int i = 0; i != ndims; i++)
+                dims[i] = jl_unbox_int64(jl_get_field(dimensions, i));
+
+            data = (int*) malloc(len * sizeof(int));
+            for (int i = 0; i != len; i++) {
+                data[i] = zData[i/64] & 1 << (i%64);
             }
 
-            if (ndims == 2)
-                sciErr = createMatrixOfBoolean(pvApiCtx, position, dims[0], dims[1], xData);
-            else 
-                sciErr = createHypermatOfBoolean(pvApiCtx, position, dims, ndims, xData);
-            free(xData);
-            if (sciErr.iErr)
-            {
-                printError(&sciErr, 0);
-                return 0;
+            sciprint("size: (");
+            for (int i = 0; i != ndims; i++){
+                sciprint("%d, ", dims[i]);
             }
+            sciprint(")\n");
+        }
+
+        if (ndims == 2)
+            sciErr = createMatrixOfBoolean(pvApiCtx, position, dims[0], dims[1], data);
+        else 
+            sciErr = createHypermatOfBoolean(pvApiCtx, position, dims, ndims, data);
+        free(data);
+        free(dims);
+        if (sciErr.iErr)
+        {
+            printError(&sciErr, 0);
+            return 0;
         }
     }
     else if (jl_typeis(input, jl_bool_type)){
@@ -161,6 +198,19 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
             return 0;
         }
     }
+    // else if (jl_isa(input, jl_get_global(jl_base_module, jl_symbol("BitArray")))) {
+    //     typedef struct {
+    //         jl_array_t *chunks;
+    //         int64_t len;
+    //         jl_value_t *dims; 
+    //     } jl_bit_array_t;
+
+    //     jl_bit_array_t *ret = (jl_bit_array_t*) input;
+
+    //     int64_t len = ret->len;
+    //     uint64_t zData = (uint64_t*) jl_array_data(ret->chunks);
+        
+    // }
     
     return 1;
 }

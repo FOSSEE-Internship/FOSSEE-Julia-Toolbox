@@ -163,7 +163,7 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
     }
     else {
         sciprint("%s: single return value\n", fname);
-        if(jl_is_array(ret)) {
+        if(jl_is_array(ret) ) {
             int ndims = jl_array_ndims(ret);
 
             if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_float64_type, ndims)) || 
@@ -171,7 +171,7 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
-            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims))) {
+            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims)) || jl_isa(ret, jl_get_global(jl_base_module, jl_symbol("BitArray")))) {
                 sciprint("%s: Boolean variable\n", fname);
                 err = bool_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
@@ -196,6 +196,7 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
         else {
             if(jl_typeis(ret, jl_float64_type) || 
                 jl_typeis(ret, jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&(jl_float64_type), 1))) {
+                
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
@@ -224,7 +225,7 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
                 sciprint("%s: %s variable\n", fname, jl_typeof_str(ret));
                 if (strcmp(jl_typeof_str(ret), "") )
                 JL_GC_POP();
-                Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
+                Scierror(999, "%s: %s type variable not implemented yet\n", fname, jl_typeof_str(ret));
                 return 0;
             }
         }
@@ -232,7 +233,7 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
         
         if (err == 0) {
             JL_GC_POP();
-            Scierror(999, "%s: Error in getting data this data type from Julia\n", fname);
+            Scierror(999, "%s: Error in getting data from this data type from Julia\n", fname);
             return 0;
         }
 
@@ -473,7 +474,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     }
     else {
         sciprint("%s: single return value\n", functionName);
-        if(jl_is_array(ret)) {
+        if(jl_is_array(ret) || jl_isa(ret, jl_get_global(jl_base_module, jl_symbol("BitArray")))) {
             int ndims = jl_array_ndims(ret);
 
             if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_float64_type, ndims)) || 
@@ -481,7 +482,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
-            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims))) {
+            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims)) || jl_isa(ret, jl_get_global(jl_base_module, jl_symbol("BitArray")))) {
                 sciprint("%s: Boolean variable\n", fname);
                 err = bool_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }

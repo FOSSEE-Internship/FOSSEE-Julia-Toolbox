@@ -5,7 +5,7 @@ int main() {
 
     ////////// Julia Init Code //////////
     /* required: setup the Julia context */
-    jl_init(NULL);
+    jl_init();
 
     char sparse_construct[100];
     sprintf(sparse_construct, "sparse([0 4325; 23 0; 0 0; 245 2352])");
@@ -45,7 +45,7 @@ int main() {
     inpArgs[1] = mat->rowval;
     inpArgs[2] = mat->nzval;
 
-    jl_value_t *jl_sparse_t = jl_get_global(jl_base_module, jl_symbol("SparseMatrixCSC{Int64, Int64}")); 
+    jl_value_t *jl_sparse_t = jl_get_global(jl_base_module, jl_symbol("SparseMatrixCSC")); 
     // jl_value_t *sparse_double_type = jl_apply_type(jl_sparse_t, jl_svec2(jl_float64_type, jl_int64_type));
     if (jl_isa(empty, jl_sparse_t)) 
         printf("Yes!\n");

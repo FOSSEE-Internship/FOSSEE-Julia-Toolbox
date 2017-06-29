@@ -3,12 +3,12 @@ M = hypermat([2 3 2 2],[%T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, 
 callJulia('+', M, M)
 
 
-// // // testing for boolean
-// [z] = callJulia('!', %T)
-// t =[%T, %T, %T; %F, %T, %F]
-// [z] = callJulia('!', t)
-// M = hypermat([2 3 2 2], [%T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F])
-// [x] = callJulia('!', M)
+// testing for boolean
+[z] = callJulia('!', %T)
+t =[%T, %T, %T; %F, %T, %F]
+[z] = callJulia('!', t)
+M = hypermat([2 3 2 2], [%T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F])
+[x] = callJulia('!', M)
 
 
 
@@ -19,7 +19,6 @@ B = callJulia('+', M, M)
 [a, b] = callJulia('divrem', 43, 3)
 
 // test for integers
-
 [e] = callJulia('+', uint32(43), uint32(4))
 [a, b] = callJulia('divrem', uint32(43), uint32(4))
 [c, d] = callJulia('divrem', [uint32(43), uint32(4)], uint32(5))
@@ -44,5 +43,5 @@ t = callJulia('+', n, n)
 // sparse
 n = [0, 4325; 23, 0; 0, 0; 245, 2352]
 m = sparse(n)
-c= callJulia('+', m', m')
+c= callJulia('+', m', m') 
 
