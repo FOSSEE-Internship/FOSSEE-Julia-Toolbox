@@ -70,9 +70,67 @@ int sparse_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
     for (int i = 0; i != num; i++)
         zData[i] = colPos[i];
 
-    mat->colptr = colptr;
-    mat->rowval = rowval;
-    mat->nzval = nzval;
-    // *ret = (jl_value_t*)rowval;
+    mat->colptr = (jl_array_t*)colptr;
+    mat->rowval = (jl_array_t*)rowval;
+    mat->nzval = (jl_array_t*)nzval;
     return 1;
 }
+
+int sparse_jl_to_sci(jl_value_t *input, int position) {
+    // Error management variable
+    SciErr sciErr;
+    int err;
+
+    // get function using the function name provided
+    jl_function_t *func = jl_get_function(jl_base_module, "transpose");
+    if (jl_exception_occurred()) {
+        printf("%s \n", jl_typeof_str(jl_exception_occurred()));
+        return 0;
+    }
+
+    jl_value_t *ret = jl_call1(func, input);
+
+    typedef struct {
+        int64_t m;
+        int64_t n;
+        jl_array_t *colptr;
+        jl_array_t *rowval;
+        jl_array_t *nzval;
+    } jl_sparse_matrix_csc_t;
+
+    jl_sparse_matrix_csc_t *mat = (jl_sparse_matrix_csc_t *) ret;
+
+    int m = mat->n;
+    int n = mat->m;
+    int num = jl_array_len(mat->nzval);
+    double *data = mat->nzval;
+
+    int *numRow;
+    int *colPos;
+
+    numRow = (int*) malloc(sizeof(int) * m);
+    int64_t *colptr = (int64_t*) jl_array_data(mat->colptr);
+    for(int i = 0; i != m; i++) {
+        numRow[i] = colptr[i + 1] - colptr[i];
+    }
+
+    colPos = (int*) malloc(sizeof(int) * num);
+    int64_t *rowval = (int64_t*) jl_array_data(mat->rowval);
+    for (int i = 0; i != num; i++) {
+        colPos[i] = rowval[i];
+    }
+
+    sciErr = createSparseMatrix(pvApiCtx, position, m, n, num, numRow, colPos, data);
+    free(numRow);
+    free(colPos);
+
+    if (sciErr.iErr)
+    {
+        JL_GC_POP();
+        printError(&sciErr, 0);
+        return 0;
+    }
+
+    return 1;
+}
+

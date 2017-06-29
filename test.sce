@@ -39,5 +39,6 @@
 
 // sparse
 n = [0, 4325; 23, 0; 0, 0; 245, 2352]
-callJulia('full', sparse(n)')
+m = sparse(n)
+callJulia('+', m', m')
 

@@ -32,18 +32,25 @@ int main() {
         return 0;
     }
 
-    printf("%s %s %s\n", jl_typeof_str(mat->colptr), jl_typeof_str(mat->rowval), jl_typeof_str(mat->nzval));
+    printf("%s: %s %s %s\n", jl_typeof_str(empty), jl_typeof_str(mat->colptr), jl_typeof_str(mat->rowval), jl_typeof_str(mat->nzval));
 
-    if (jl_typeis(mat->colptr, jl_apply_array_type(jl_int32_type, 1))) {
-        printf("Yes int32\n");
-    }
-    else if (jl_typeis(mat->colptr, jl_apply_array_type(jl_int64_type, 1))) {
-        printf("Yes int64\n");
-    }
+    // if (jl_typeis(mat->colptr, jl_apply_array_type(jl_int32_type, 1))) {
+    //     printf("Yes int32\n");
+    // }
+    // else if (jl_typeis(mat->colptr, jl_apply_array_type(jl_int64_type, 1))) {
+    //     printf("Yes int64\n");
+    // }
 
     inpArgs[0] = mat->colptr;
     inpArgs[1] = mat->rowval;
     inpArgs[2] = mat->nzval;
+
+    jl_value_t *jl_sparse_t = jl_get_global(jl_base_module, jl_symbol("SparseMatrixCSC{Int64, Int64}")); 
+    // jl_value_t *sparse_double_type = jl_apply_type(jl_sparse_t, jl_svec2(jl_float64_type, jl_int64_type));
+    if (jl_isa(empty, jl_sparse_t)) 
+        printf("Yes!\n");
+    else 
+        printf("No!\n");
 
     jl_value_t *ret = jl_call(func, inpArgs, 3);
     JL_GC_POP();
@@ -51,6 +58,8 @@ int main() {
     JL_GC_PUSH1(&ret);
     printf("%s\n", jl_string_data(ret));
     JL_GC_POP();
+
+    printf("%s\n", jl_string_data(jl_call1(func, empty)));
     /* strongly recommended: notify Julia that the
          program is about to terminate. this allows
          Julia time to cleanup pending write requests

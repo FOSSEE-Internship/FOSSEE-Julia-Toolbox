@@ -16,12 +16,13 @@ extern int string_sci_to_jl(int *piAddressVar, jl_value_t **ret);
 extern int string_jl_to_sci(jl_value_t *input, int position);
 
 extern int sparse_sci_to_jl(int *piAddressVar, jl_value_t **ret);
+extern int sparse_jl_to_sci(jl_value_t *input, int position);
 
 int sci_init_julia(char* fname, unsigned long fname_len) {
     
     ////////// Julia Init Code //////////
     /* required: setup the Julia context */
-    jl_init(NULL);
+    jl_init();
     return 0;
 }
 
@@ -529,8 +530,12 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 sciprint("%s: String variable\n", fname);
                 err = string_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
+            else if (jl_typeis(ret, jl_get_global(jl_base_module, jl_symbol("SparseMatrixCSC")))) {
+                sciprint("%s: SparseMatrixCSC variable\n", fname);
+                err = sparse_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
+            }
             else {
-                sciprint("%s: %s variable\n", functionName, jl_typeof_str(ret));
+                sciprint("%s: %s variable\n", fname, jl_typeof_str(ret));
                 // if (jl_typeis(ret, ))
                 JL_GC_POP();
                 Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
