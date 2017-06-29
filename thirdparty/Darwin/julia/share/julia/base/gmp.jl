@@ -4,20 +4,21 @@ module GMP
 
 export BigInt
 
-import Base: *, +, -, /, <, <<, >>, >>>, <=, ==, >, >=, ^, (~), (&), (|), ($),
+import Base: *, +, -, /, <, <<, >>, >>>, <=, ==, >, >=, ^, (~), (&), (|), xor,
              binomial, cmp, convert, div, divrem, factorial, fld, gcd, gcdx, lcm, mod,
              ndigits, promote_rule, rem, show, isqrt, string, powermod,
              sum, trailing_zeros, trailing_ones, count_ones, base, tryparse_internal,
-             bin, oct, dec, hex, isequal, invmod, prevpow2, nextpow2, ndigits0z, widen, signed, unsafe_trunc, trunc
+             bin, oct, dec, hex, isequal, invmod, prevpow2, nextpow2, ndigits0z, widen, signed, unsafe_trunc, trunc,
+             iszero, flipsign, signbit
 
 if Clong == Int32
-    typealias ClongMax Union{Int8, Int16, Int32}
-    typealias CulongMax Union{UInt8, UInt16, UInt32}
+    const ClongMax = Union{Int8, Int16, Int32}
+    const CulongMax = Union{UInt8, UInt16, UInt32}
 else
-    typealias ClongMax Union{Int8, Int16, Int32, Int64}
-    typealias CulongMax Union{UInt8, UInt16, UInt32, UInt64}
+    const ClongMax = Union{Int8, Int16, Int32, Int64}
+    const CulongMax = Union{UInt8, UInt16, UInt32, UInt64}
 end
-typealias CdoubleMax Union{Float16, Float32, Float64}
+const CdoubleMax = Union{Float16, Float32, Float64}
 
 gmp_version() = VersionNumber(unsafe_string(unsafe_load(cglobal((:__gmp_version, :libgmp), Ptr{Cchar}))))
 gmp_bits_per_limb() = Int(unsafe_load(cglobal((:__gmp_bits_per_limb, :libgmp), Cint)))
@@ -29,15 +30,19 @@ const GMP_BITS_PER_LIMB = gmp_bits_per_limb()
 # `unsigned int` or `unsigned long long int`. The correct unsigned type is here named Limb, and must
 # be used whenever mp_limb_t is in the signature of ccall'ed GMP functions.
 if GMP_BITS_PER_LIMB == 32
-    typealias Limb UInt32
+    const Limb = UInt32
 elseif GMP_BITS_PER_LIMB == 64
-    typealias Limb UInt64
+    const Limb = UInt64
 else
     error("GMP: cannot determine the type mp_limb_t (__gmp_bits_per_limb == $GMP_BITS_PER_LIMB)")
 end
 
+"""
+    BigInt <: Integer
 
-type BigInt <: Integer
+Arbitrary precision integer type.
+"""
+mutable struct BigInt <: Integer
     alloc::Cint
     size::Cint
     d::Ptr{Limb}
@@ -48,6 +53,30 @@ type BigInt <: Integer
         return b
     end
 end
+
+const ZERO = BigInt()
+const ONE  = BigInt()
+const _ONE = Limb[1]
+
+"""
+    BigInt(x)
+
+Create an arbitrary precision integer. `x` may be an `Int` (or anything that can be
+converted to an `Int`). The usual mathematical operators are defined for this type, and
+results are promoted to a [`BigInt`](@ref).
+
+Instances can be constructed from strings via [`parse`](@ref), or using the `big`
+string literal.
+
+```jldoctest
+julia> parse(BigInt, "42")
+42
+
+julia> big"313"
+313
+```
+"""
+BigInt(x)
 
 function __init__()
     try
@@ -62,6 +91,9 @@ function __init__()
               cglobal(:jl_gc_counted_malloc),
               cglobal(:jl_gc_counted_realloc_with_old_size),
               cglobal(:jl_gc_counted_free))
+
+        ZERO.alloc, ZERO.size, ZERO.d = 0, 0, C_NULL
+        ONE.alloc, ONE.size, ONE.d = 1, 1, pointer(_ONE)
     catch ex
         Base.showerror_nostdio(ex,
             "WARNING: Error during initialization of module GMP")
@@ -103,7 +135,7 @@ function tryparse_internal(::Type{BigInt}, s::AbstractString, startpos::Int, end
         raise && throw(ArgumentError("invalid BigInt: $(repr(bstr))"))
         return _n
     end
-    Nullable(sgn < 0 ? -z : z)
+    Nullable(flipsign!(z, sgn))
 end
 
 function convert(::Type{BigInt}, x::Union{Clong,Int32})
@@ -174,10 +206,12 @@ function rem{T<:Union{Unsigned,Signed}}(x::BigInt, ::Type{T})
     for l = 1:min(abs(x.size), cld(sizeof(T),sizeof(Limb)))
         u += (unsafe_load(x.d,l)%T) << ((sizeof(Limb)<<3)*(l-1))
     end
-    x.size < 0 ? -u : u
+    flipsign(u, x)
 end
 
-function convert{T<:Unsigned}(::Type{T}, x::BigInt)
+rem(x::Integer, ::Type{BigInt}) = convert(BigInt, x)
+
+function convert(::Type{T}, x::BigInt) where T<:Unsigned
     if sizeof(T) < sizeof(Limb)
         convert(T, convert(Limb,x))
     else
@@ -186,7 +220,7 @@ function convert{T<:Unsigned}(::Type{T}, x::BigInt)
     end
 end
 
-function convert{T<:Signed}(::Type{T}, x::BigInt)
+function convert(::Type{T}, x::BigInt) where T<:Signed
     n = abs(x.size)
     if sizeof(T) < sizeof(Limb)
         SLimb = typeof(Signed(one(Limb)))
@@ -194,7 +228,7 @@ function convert{T<:Signed}(::Type{T}, x::BigInt)
     else
         0 <= n <= cld(sizeof(T),sizeof(Limb)) || throw(InexactError())
         y = x % T
-        (x.size > 0) $ (y > 0) && throw(InexactError()) # catch overflow
+        ispos(x) ⊻ (y > 0) && throw(InexactError()) # catch overflow
         y
     end
 end
@@ -204,20 +238,20 @@ function (::Type{Float64})(n::BigInt, ::RoundingMode{:ToZero})
     ccall((:__gmpz_get_d, :libgmp), Float64, (Ptr{BigInt},), &n)
 end
 
-function (::Type{T}){T<:Union{Float16,Float32}}(n::BigInt, ::RoundingMode{:ToZero})
+function (::Type{T})(n::BigInt, ::RoundingMode{:ToZero}) where T<:Union{Float16,Float32}
     T(Float64(n,RoundToZero),RoundToZero)
 end
 
-function (::Type{T}){T<:CdoubleMax}(n::BigInt, ::RoundingMode{:Down})
+function (::Type{T})(n::BigInt, ::RoundingMode{:Down}) where T<:CdoubleMax
     x = T(n,RoundToZero)
     x > n ? prevfloat(x) : x
 end
-function (::Type{T}){T<:CdoubleMax}(n::BigInt, ::RoundingMode{:Up})
+function (::Type{T})(n::BigInt, ::RoundingMode{:Up}) where T<:CdoubleMax
     x = T(n,RoundToZero)
     x < n ? nextfloat(x) : x
 end
 
-function (::Type{T}){T<:CdoubleMax}(n::BigInt, ::RoundingMode{:Nearest})
+function (::Type{T})(n::BigInt, ::RoundingMode{:Nearest}) where T<:CdoubleMax
     x = T(n,RoundToZero)
     if maxintfloat(T) <= abs(x) < T(Inf)
         r = n-BigInt(x)
@@ -243,13 +277,13 @@ convert(::Type{Float64}, n::BigInt) = Float64(n,RoundNearest)
 convert(::Type{Float32}, n::BigInt) = Float32(n,RoundNearest)
 convert(::Type{Float16}, n::BigInt) = Float16(n,RoundNearest)
 
-promote_rule{T<:Integer}(::Type{BigInt}, ::Type{T}) = BigInt
+promote_rule(::Type{BigInt}, ::Type{<:Integer}) = BigInt
 
 # Binary ops
 for (fJ, fC) in ((:+, :add), (:-,:sub), (:*, :mul),
                  (:fld, :fdiv_q), (:div, :tdiv_q), (:mod, :fdiv_r), (:rem, :tdiv_r),
                  (:gcd, :gcd), (:lcm, :lcm),
-                 (:&, :and), (:|, :ior), (:$, :xor))
+                 (:&, :and), (:|, :ior), (:xor, :xor))
     @eval begin
         function ($fJ)(x::BigInt, y::BigInt)
             z = BigInt()
@@ -258,6 +292,8 @@ for (fJ, fC) in ((:+, :add), (:-,:sub), (:*, :mul),
         end
     end
 end
+
+/(x::BigInt, y::BigInt) = float(x)/float(y)
 
 function invmod(x::BigInt, y::BigInt)
     z = zero(BigInt)
@@ -279,7 +315,7 @@ function invmod(x::BigInt, y::BigInt)
 end
 
 # More efficient commutative operations
-for (fJ, fC) in ((:+, :add), (:*, :mul), (:&, :and), (:|, :ior), (:$, :xor))
+for (fJ, fC) in ((:+, :add), (:*, :mul), (:&, :and), (:|, :ior), (:xor, :xor))
     @eval begin
         function ($fJ)(a::BigInt, b::BigInt, c::BigInt)
             z = BigInt()
@@ -341,6 +377,9 @@ function *(x::BigInt, c::ClongMax)
 end
 *(c::ClongMax, x::BigInt) = x * c
 
+/(x::BigInt, y::Union{ClongMax,CulongMax}) = float(x)/y
+/(x::Union{ClongMax,CulongMax}, y::BigInt) = x/float(y)
+
 # unary ops
 for (fJ, fC) in ((:-, :neg), (:~, :com))
     @eval begin
@@ -373,6 +412,13 @@ trailing_zeros(x::BigInt) = Int(ccall((:__gmpz_scan1, :libgmp), Culong, (Ptr{Big
 trailing_ones(x::BigInt) = Int(ccall((:__gmpz_scan0, :libgmp), Culong, (Ptr{BigInt}, Culong), &x, 0))
 
 count_ones(x::BigInt) = Int(ccall((:__gmpz_popcount, :libgmp), Culong, (Ptr{BigInt},), &x))
+
+"""
+    count_ones_abs(x::BigInt)
+
+Number of ones in the binary representation of abs(x).
+"""
+count_ones_abs(x::BigInt) = iszero(x) ? 0 : ccall((:__gmpn_popcount, :libgmp), Culong, (Ptr{Limb}, Csize_t), x.d, abs(x.size)) % Int
 
 function divrem(x::BigInt, y::BigInt)
     z1 = BigInt()
@@ -448,8 +494,10 @@ end
 powermod(x::Integer, p::Integer, m::BigInt) = powermod(big(x), big(p), m)
 
 function gcdx(a::BigInt, b::BigInt)
-    if b == 0 # shortcut this to ensure consistent results with gcdx(a,b)
-        return a < 0 ? (-a,-one(BigInt),zero(BigInt)) : (a,one(BigInt),zero(BigInt))
+    if iszero(b) # shortcut this to ensure consistent results with gcdx(a,b)
+        return a < 0 ? (-a,-ONE,b) : (a,one(BigInt),b)
+        # we don't return the globals ONE and ZERO in case the user wants to
+        # mutate the result
     end
     g = BigInt()
     s = BigInt()
@@ -479,7 +527,7 @@ function sum(arr::AbstractArray{BigInt})
 end
 
 function factorial(x::BigInt)
-    x.size < 0 && return BigInt(0)
+    isneg(x) && return BigInt(0)
     z = BigInt()
     ccall((:__gmpz_fac_ui, :libgmp), Void, (Ptr{BigInt}, Culong), &z, x)
     return z
@@ -497,6 +545,7 @@ binomial(n::BigInt, k::Integer) = k < 0 ? BigInt(0) : binomial(n, UInt(k))
 ==(i::Integer, x::BigInt) = cmp(x,i) == 0
 ==(x::BigInt, f::CdoubleMax) = isnan(f) ? false : cmp(x,f) == 0
 ==(f::CdoubleMax, x::BigInt) = isnan(f) ? false : cmp(x,f) == 0
+iszero(x::BigInt) = x.size == 0
 
 <=(x::BigInt, y::BigInt) = cmp(x,y) <= 0
 <=(x::BigInt, i::Integer) = cmp(x,i) <= 0
@@ -509,6 +558,12 @@ binomial(n::BigInt, k::Integer) = k < 0 ? BigInt(0) : binomial(n, UInt(k))
 <(i::Integer, x::BigInt) = cmp(x,i) > 0
 <(x::BigInt, f::CdoubleMax) = isnan(f) ? false : cmp(x,f) < 0
 <(f::CdoubleMax, x::BigInt) = isnan(f) ? false : cmp(x,f) > 0
+isneg(x::BigInt) = x.size < 0
+ispos(x::BigInt) = x.size > 0
+
+signbit(x::BigInt) = isneg(x)
+flipsign!(x::BigInt, y::Integer) = (signbit(y) && (x.size = -x.size); x)
+flipsign( x::BigInt, y::Integer) = signbit(y) ? -x : x
 
 string(x::BigInt) = dec(x)
 show(io::IO, x::BigInt) = print(io, string(x))
@@ -518,10 +573,31 @@ oct(n::BigInt) = base( 8, n)
 dec(n::BigInt) = base(10, n)
 hex(n::BigInt) = base(16, n)
 
+bin(n::BigInt, pad::Int) = base( 2, n, pad)
+oct(n::BigInt, pad::Int) = base( 8, n, pad)
+dec(n::BigInt, pad::Int) = base(10, n, pad)
+hex(n::BigInt, pad::Int) = base(16, n, pad)
+
 function base(b::Integer, n::BigInt)
     2 <= b <= 62 || throw(ArgumentError("base must be 2 ≤ base ≤ 62, got $b"))
-    p = ccall((:__gmpz_get_str,:libgmp), Ptr{UInt8}, (Ptr{UInt8}, Cint, Ptr{BigInt}), C_NULL, b, &n)
-    unsafe_wrap(String, p, true)
+    nd = ndigits(n, b)
+    str = Base._string_n(n < 0 ? nd+1 : nd)
+    ccall((:__gmpz_get_str,:libgmp), Ptr{UInt8}, (Ptr{UInt8}, Cint, Ptr{BigInt}), str, b, &n)
+    return str
+end
+
+function base(b::Integer, n::BigInt, pad::Integer)
+    s = base(b, n)
+    buf = IOBuffer()
+    if n < 0
+        s = s[2:end]
+        write(buf, '-')
+    end
+    for i in 1:pad-sizeof(s) # `s` is known to be ASCII, and `length` is slower
+        write(buf, '0')
+    end
+    write(buf, s)
+    String(buf)
 end
 
 function ndigits0z(x::BigInt, b::Integer=10)
@@ -545,10 +621,12 @@ function ndigits0z(x::BigInt, b::Integer=10)
         end
     end
 end
-ndigits(x::BigInt, b::Integer=10) = x.size == 0 ? 1 : ndigits0z(x,b)
+ndigits(x::BigInt, b::Integer=10) = iszero(x) ? 1 : ndigits0z(x,b)
 
-prevpow2(x::BigInt) = x.size < 0 ? -prevpow2(-x) : (x <= 2 ? x : one(BigInt) << (ndigits(x, 2)-1))
-nextpow2(x::BigInt) = x.size < 0 ? -nextpow2(-x) : (x <= 2 ? x : one(BigInt) << ndigits(x-1, 2))
+# below, ONE is always left-shifted by at least one digit, so a new BigInt is
+# allocated, which can be safely mutated
+prevpow2(x::BigInt) = -2 <= x <= 2 ? x : flipsign!(ONE << (ndigits(x, 2) - 1), x)
+nextpow2(x::BigInt) = count_ones_abs(x) <= 1 ? x : flipsign!(ONE << ndigits(x, 2), x)
 
 Base.checked_abs(x::BigInt) = abs(x)
 Base.checked_neg(x::BigInt) = -x
@@ -560,6 +638,9 @@ Base.checked_rem(a::BigInt, b::BigInt) = rem(a, b)
 Base.checked_fld(a::BigInt, b::BigInt) = fld(a, b)
 Base.checked_mod(a::BigInt, b::BigInt) = mod(a, b)
 Base.checked_cld(a::BigInt, b::BigInt) = cld(a, b)
+Base.add_with_overflow(a::BigInt, b::BigInt) = a + b, false
+Base.sub_with_overflow(a::BigInt, b::BigInt) = a - b, false
+Base.mul_with_overflow(a::BigInt, b::BigInt) = a * b, false
 
 function Base.deepcopy_internal(x::BigInt, stackdict::ObjectIdDict)
     if haskey(stackdict, x)

@@ -3,30 +3,137 @@
 # Tests that do not really go anywhere else
 
 # Test info
-@test contains(sprint(io->info(io,"test")), "INFO:")
-@test contains(sprint(io->info(io,"test")), "INFO: test")
-@test contains(sprint(io->info(io,"test ",1,2,3)), "INFO: test 123")
+@test contains(sprint(info, "test"), "INFO:")
+@test contains(sprint(info, "test"), "INFO: test")
+@test contains(sprint(info, "test ", 1, 2, 3), "INFO: test 123")
 @test contains(sprint(io->info(io,"test", prefix="MYINFO: ")), "MYINFO: test")
 
 # Test warn
-@test contains(sprint(io->Base.warn_once(io,"test")), "WARNING: test")
-@test isempty(sprint(io->Base.warn_once(io,"test")))
+@test contains(sprint(Base.warn_once, "test"), "WARNING: test")
+@test isempty(sprint(Base.warn_once, "test"))
 
-@test contains(sprint(io->warn(io)), "WARNING:")
-@test contains(sprint(io->warn(io, "test")), "WARNING: test")
-@test contains(sprint(io->warn(io, "test ",1,2,3)), "WARNING: test 123")
+@test contains(sprint(warn), "WARNING:")
+@test contains(sprint(warn, "test"), "WARNING: test")
+@test contains(sprint(warn, "test ", 1, 2, 3), "WARNING: test 123")
 @test contains(sprint(io->warn(io, "test", prefix="MYWARNING: ")), "MYWARNING: test")
 @test contains(sprint(io->warn(io, "testonce", once=true)), "WARNING: testonce")
 @test isempty(sprint(io->warn(io, "testonce", once=true)))
 @test !isempty(sprint(io->warn(io, "testonce", once=true, key=hash("testonce",hash("testanother")))))
 let bt = backtrace()
-    ws = split(chomp(sprint(io->warn(io,"test", bt))), '\n')
-    bs = split(chomp(sprint(io->Base.show_backtrace(io,bt))), '\n')
+    ws = split(chomp(sprint(warn, "test", bt)), '\n')
+    bs = split(chomp(sprint(Base.show_backtrace, bt)), '\n')
     @test contains(ws[1],"WARNING: test")
     for (l,b) in zip(ws[2:end],bs)
         @test contains(l, b)
     end
 end
+
+# PR #16213
+module Logging
+    function bar(io)
+        info(io,"barinfo")
+        warn(io,"barwarn")
+        Base.display_error(io,"barerror",backtrace())
+    end
+    function pooh(io)
+        info(io,"poohinfo")
+        warn(io,"poohwarn")
+        Base.display_error(io,"pooherror",backtrace())
+    end
+end
+function foo(io)
+    info(io,"fooinfo")
+    warn(io,"foowarn")
+    Base.display_error(io,"fooerror",backtrace())
+end
+
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "WARNING: barwarn", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+
+logging(DevNull, Logging, :bar;  kind=:info)
+@test all(contains.(sprint(Logging.bar), ["WARNING: barwarn", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+logging(DevNull, Logging;  kind=:info)
+@test all(contains.(sprint(Logging.bar), ["WARNING: barwarn", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+logging(DevNull;  kind=:info)
+@test all(contains.(sprint(Logging.bar), ["WARNING: barwarn", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+logging(kind=:info)
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "WARNING: barwarn", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+
+logging(DevNull, Logging, :bar;  kind=:warn)
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+logging(DevNull, Logging;  kind=:warn)
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+logging(DevNull;  kind=:warn)
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "ERROR: \"fooerror\""]))
+
+logging(kind=:warn)
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "WARNING: barwarn", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+
+logging(DevNull, Logging, :bar;  kind=:error)
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "WARNING: barwarn"]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+logging(DevNull, Logging;  kind=:error)
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "WARNING: barwarn"]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn"]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+logging(DevNull;  kind=:error)
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "WARNING: barwarn"]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn"]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn"]))
+
+logging(kind=:error)
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "WARNING: barwarn", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+
+logging(DevNull, Logging, :bar)
+@test sprint(Logging.bar) == ""
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+logging(DevNull, Logging)
+@test sprint(Logging.bar) == ""
+@test sprint(Logging.pooh) == ""
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
+
+logging(DevNull)
+@test sprint(Logging.bar) == ""
+@test sprint(Logging.pooh) == ""
+@test sprint(foo) == ""
+
+logging()
+@test all(contains.(sprint(Logging.bar), ["INFO: barinfo", "WARNING: barwarn", "ERROR: \"barerror\""]))
+@test all(contains.(sprint(Logging.pooh), ["INFO: poohinfo", "WARNING: poohwarn", "ERROR: \"pooherror\""]))
+@test all(contains.(sprint(foo), ["INFO: fooinfo", "WARNING: foowarn", "ERROR: \"fooerror\""]))
 
 # test assert() method
 @test_throws AssertionError assert(false)
@@ -109,7 +216,6 @@ let # test the process title functions, issue #9957
     @test Sys.get_process_title() == oldtitle
 end
 
-
 # test gc_enable/disable
 @test gc_enable(true)
 @test gc_enable(false)
@@ -118,10 +224,12 @@ end
 @test gc_enable(true)
 
 # test methodswith
-immutable NoMethodHasThisType end
+# `methodswith` relies on exported symbols
+export func4union, Base
+struct NoMethodHasThisType end
 @test isempty(methodswith(NoMethodHasThisType))
 @test !isempty(methodswith(Int))
-immutable Type4Union end
+struct Type4Union end
 func4union(::Union{Type4Union,Int}) = ()
 @test !isempty(methodswith(Type4Union))
 
@@ -185,8 +293,17 @@ v11801, t11801 = @timed sin(1)
 # interactive utilities
 
 import Base.summarysize
-@test summarysize(Core) > summarysize(Core.Inference) > Core.sizeof(Core)
-@test summarysize(Base) > 10_000*sizeof(Int)
+@test summarysize(Core) > (summarysize(Core.Inference) + Base.summarysize(Core.Intrinsics)) > Core.sizeof(Core)
+@test summarysize(Base) > 100_000 * sizeof(Ptr)
+
+let R = Ref{Any}(nothing), depth = 10^6
+    for i = 1:depth
+        R = Ref{Any}(R)
+    end
+    R = Core.svec(R, R)
+    @test summarysize(R) == (depth + 4) * sizeof(Ptr)
+end
+
 module _test_whos_
 export x
 x = 1.0
@@ -206,24 +323,6 @@ end
     @test isa(ex, ErrorException) && ex.msg == "cannot assign variables in other modules"
 end
 
-@test !Base.is_unix(:Windows)
-@test !Base.is_linux(:Windows)
-@test Base.is_linux(:Linux)
-@test Base.is_windows(:Windows)
-@test Base.is_windows(:NT)
-@test !Base.is_windows(:Darwin)
-@test Base.is_apple(:Darwin)
-@test Base.is_apple(:Apple)
-@test !Base.is_apple(:Windows)
-@test Base.is_unix(:Darwin)
-@test Base.is_unix(:FreeBSD)
-@test_throws ArgumentError Base.is_unix(:BeOS)
-if !is_windows()
-    @test Sys.windows_version() === (0, 0)
-else
-    @test (Sys.windows_version()::Tuple{Int,Int})[1] > 0
-end
-
 # Issue 14173
 module Tmp14173
     export A
@@ -231,7 +330,7 @@ module Tmp14173
 end
 whos(IOBuffer(), Tmp14173) # warm up
 const MEMDEBUG = ccall(:jl_is_memdebug, Bool, ())
-@test @allocated(whos(IOBuffer(), Tmp14173)) < (MEMDEBUG ? 30000 : 8000)
+@test @allocated(whos(IOBuffer(), Tmp14173)) < (MEMDEBUG ? 30000 : 10000)
 
 ## test conversion from UTF-8 to UTF-16 (for Windows APIs)
 
@@ -402,7 +501,7 @@ end
 
 let s = "abcα🐨\0x\0"
     for T in (UInt8, UInt16, UInt32, Int32)
-        @test transcode(T, s) == transcode(T, s.data)
+        @test transcode(T, s) == transcode(T, Vector{UInt8}(s))
         @test transcode(String, transcode(T, s)) == s
     end
 end
@@ -415,9 +514,19 @@ if is_windows()
     end
 end
 
-optstring = sprint(show, Base.JLOptions())
-@test startswith(optstring, "JLOptions(")
-@test endswith(optstring, ")")
+let optstring = stringmime(MIME("text/plain"), Base.JLOptions())
+    @test startswith(optstring, "JLOptions(\n")
+    @test !contains(optstring, "Ptr")
+    @test endswith(optstring, "\n)")
+    @test contains(optstring, " = \"")
+end
+let optstring = repr(Base.JLOptions())
+    @test startswith(optstring, "JLOptions(")
+    @test endswith(optstring, ")")
+    @test !contains(optstring, "\n")
+    @test !contains(optstring, "Ptr")
+    @test contains(optstring, " = \"")
+end
 
 # Base.securezero! functions (#17579)
 import Base: securezero!, unsafe_securezero!
@@ -451,4 +560,185 @@ if is_windows()
             addr, 4096, PAGE_EXECUTE_READWRITE, oldPerm)
         err18083 == 0 && error(Libc.GetLastError())
     end
+end
+
+# CRC32c checksum (test data generated from @andrewcooke's CRC.jl package)
+for force_software_crc in (1,0)
+    ccall(:jl_crc32c_init, Void, (Cint,), force_software_crc)
+    for (n,crc) in [(0,0x00000000),(1,0xa016d052),(2,0x03f89f52),(3,0xf130f21e),(4,0x29308cf4),(5,0x53518fab),(6,0x4f4dfbab),(7,0xbd3a64dc),(8,0x46891f81),(9,0x5a14b9f9),(10,0xb219db69),(11,0xd232a91f),(12,0x51a15563),(13,0x9f92de41),(14,0x4d8ae017),(15,0xc8b74611),(16,0xa0de6714),(17,0x672c992a),(18,0xe8206eb6),(19,0xc52fd285),(20,0x327b0397),(21,0x318263dd),(22,0x08485ccd),(23,0xea44d29e),(24,0xf6c0cb13),(25,0x3969bba2),(26,0x6a8810ec),(27,0x75b3d0df),(28,0x82d535b1),(29,0xbdf7fc12),(30,0x1f836b7d),(31,0xd29f33af),(32,0x8e4acb3e),(33,0x1cbee2d1),(34,0xb25f7132),(35,0xb0fa484c),(36,0xb9d262b4),(37,0x3207fe27),(38,0xa024d7ac),(39,0x49a2e7c5),(40,0x0e2c157f),(41,0x25f7427f),(42,0x368c6adc),(43,0x75efd4a5),(44,0xa84c5c31),(45,0x0fc817b2),(46,0x8d99a881),(47,0x5cc3c078),(48,0x9983d5e2),(49,0x9267c2db),(50,0xc96d4745),(51,0x058d8df3),(52,0x453f9cf3),(53,0xb714ade1),(54,0x55d3c2bc),(55,0x495710d0),(56,0x3bddf494),(57,0x4f2577d0),(58,0xdae0f604),(59,0x3c57c632),(60,0xfe39bbb0),(61,0x6f5d1d41),(62,0x7d996665),(63,0x68c738dc),(64,0x8dfea7ae)]
+        @test Base.crc32c(UInt8[1:n;]) == crc
+    end
+end
+
+let
+    old_have_color = Base.have_color
+    try
+        @eval Base have_color = true
+        buf = IOBuffer()
+        print_with_color(:red, buf, "foo")
+        @test startswith(String(take!(buf)), Base.text_colors[:red])
+    finally
+        @eval Base have_color = $(old_have_color)
+    end
+end
+
+# Test that `print_with_color` accepts non-string values, just as `print` does
+let
+    old_have_color = Base.have_color
+    try
+        @eval Base have_color = true
+        buf_color = IOBuffer()
+        args = (3.2, "foo", :testsym)
+        print_with_color(:red, buf_color, args...)
+        buf_plain = IOBuffer()
+        print(buf_plain, args...)
+        expected_str = string(Base.text_colors[:red],
+                              String(take!(buf_plain)),
+                              Base.text_colors[:default])
+        @test expected_str == String(take!(buf_color))
+    finally
+        @eval Base have_color = $(old_have_color)
+    end
+end
+
+let
+    global c_18711 = 0
+    buf = IOContext(IOBuffer(), :hascontext => true)
+    Base.with_output_color(:red, buf) do buf
+        global c_18711
+        get(buf, :hascontext, false) && (c_18711 += 1)
+    end
+    @test c_18711 == 1
+end
+
+let
+    old_have_color = Base.have_color
+    try
+        @eval Base have_color = true
+        buf = IOBuffer()
+        print_with_color(:red, buf, "foo")
+        # Check that we get back to normal text color in the end
+        @test String(take!(buf)) == "\e[31mfoo\e[39m"
+
+        # Check that boldness is turned off
+        print_with_color(:red, buf, "foo"; bold = true)
+        @test String(take!(buf)) == "\e[1m\e[31mfoo\e[39m\e[22m"
+    finally
+        @eval Base have_color = $(old_have_color)
+    end
+end
+
+abstract type DA_19281{T, N} <: AbstractArray{T, N} end
+Base.convert{S,T,N}(::Type{Array{S, N}}, ::DA_19281{T, N}) = error()
+x_19281 = [(), (1,)]
+mutable struct Foo_19281
+    f::Vector{Tuple}
+    Foo_19281() = new(x_19281)
+end
+
+@testset "test this does not segfault #19281" begin
+    @test Foo_19281().f[1] == ()
+    @test Foo_19281().f[2] == (1,)
+end
+
+let
+    x_notdefined = Ref{String}()
+    @test !isassigned(x_notdefined)
+
+    x_defined = Ref{String}("Test")
+    @test isassigned(x_defined)
+end
+
+mutable struct Demo_20254
+    arr::Array{String}
+end
+
+# these cause stack overflows and are a little flaky on CI, ref #20256
+if Bool(parse(Int,(get(ENV, "JULIA_TESTFULL", "0"))))
+    function Demo_20254(arr::AbstractArray=Any[])
+        Demo_20254(string.(arr))
+    end
+
+    _unsafe_get_19433(x::NTuple{1}) = (unsafe_get(x[1]),)
+    _unsafe_get_19433(xs::Vararg) = (unsafe_get(xs[1]), _unsafe_get_19433(xs[2:end])...)
+
+    f_19433(f_19433, xs...) = f_19433(_unsafe_get_19433(xs)...)
+
+    @testset "test this does not crash, issue #19433 and #20254" begin
+        @test_throws StackOverflowError Demo_20254()
+        @test_throws StackOverflowError f_19433(+, 1, 2)
+    end
+end
+
+# invokelatest function for issue #19774
+issue19774(x) = 1
+let foo() = begin
+        eval(:(issue19774(x::Int) = 2))
+        return Base.invokelatest(issue19774, 0)
+    end
+    @test foo() == 2
+end
+
+# Endian tests
+# For now, we only support little endian.
+# Add an `Sys.ARCH` test for big endian when/if we add support for that.
+# Do **NOT** use `ENDIAN_BOM` to figure out the endianess
+# since that's exactly what we want to test.
+@test ENDIAN_BOM == 0x04030201
+@test ntoh(0x1) == 0x1
+@test hton(0x1) == 0x1
+@test ltoh(0x1) == 0x1
+@test htol(0x1) == 0x1
+@test ntoh(0x102) == 0x201
+@test hton(0x102) == 0x201
+@test ltoh(0x102) == 0x102
+@test htol(0x102) == 0x102
+@test ntoh(0x1020304) == 0x4030201
+@test hton(0x1020304) == 0x4030201
+@test ltoh(0x1020304) == 0x1020304
+@test htol(0x1020304) == 0x1020304
+@test ntoh(0x102030405060708) == 0x807060504030201
+@test hton(0x102030405060708) == 0x807060504030201
+@test ltoh(0x102030405060708) == 0x102030405060708
+@test htol(0x102030405060708) == 0x102030405060708
+
+module DeprecationTests # to test @deprecate
+    f() = true
+
+    # test the Symbol path of @deprecate
+    @deprecate f1 f
+    @deprecate f2 f false # test that f2 is not exported
+
+    # test the Expr path of @deprecate
+    @deprecate f3() f()
+    @deprecate f4() f() false # test that f4 is not exported
+    @deprecate f5(x::T) where T f()
+
+    # test deprecation of a constructor
+    struct A{T} end
+    @deprecate A{T}(x::S) where {T, S} f()
+end # module
+
+@testset "@deprecate" begin
+    using .DeprecationTests
+    # enable when issue #22043 is fixed
+    # @test @test_warn "f1 is deprecated, use f instead." f1()
+    # @test @test_nowarn f1()
+
+    # @test_throws UndefVarError f2() # not exported
+    # @test @test_warn "f2 is deprecated, use f instead." DeprecationTests.f2()
+    # @test @test_nowarn DeprecationTests.f2()
+
+    # @test @test_warn "f3() is deprecated, use f() instead." f3()
+    # @test @test_nowarn f3()
+
+    # @test_throws UndefVarError f4() # not exported
+    # @test @test_warn "f4() is deprecated, use f() instead." DeprecationTests.f4()
+    # @test @test_nowarn DeprecationTests.f4()
+
+    # @test @test_warn "f5(x::T) where T is deprecated, use f() instead." f5(1)
+    # @test @test_nowarn f5(1)
+
+    # @test @test_warn "A{T}(x::S) where {T, S} is deprecated, use f() instead." A{Int}(1.)
+    # @test @test_nowarn A{Int}(1.)
 end

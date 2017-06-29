@@ -1,5 +1,5 @@
 # This file should contain site-specific commands to be executed on Julia startup
-# Users should store their own personal commands in homedir(), in a file named .juliarc.jl
+# Users may store their own personal commands in the user home directory `homedir()`, in a file named `.juliarc.jl`
 
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 

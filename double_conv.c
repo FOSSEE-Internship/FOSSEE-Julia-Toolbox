@@ -19,8 +19,12 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             {
                 return 0;
             }
-
-            jl_value_t *scalar_type = jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type));
+            // jl_value_t **args;
+            // JL_GC_PUSHARGS(args, 1);
+            // args[0] = jl_float64_type;
+            // jl_value_t *scalar_type = jl_apply_type((jl_value_t*)jl_complex_type, args, 1);
+            // JL_GC_POP();
+            jl_value_t *scalar_type = jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&jl_float64_type, 1);
             *ret = (jl_value_t*)jl_new_struct_uninit((jl_datatype_t *)scalar_type);
     
             double complex *temp = (double complex*) *ret;
@@ -83,8 +87,8 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             }
             sciprint(")\n");
 
-            jl_value_t *array_element_type = jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type));
-            jl_value_t *array_type = jl_apply_array_type((jl_datatype_t *)array_element_type, ndims);
+            jl_value_t *array_element_type = jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&jl_float64_type, 1);
+            jl_value_t *array_type = jl_apply_array_type(array_element_type, ndims);
             
             jl_value_t *types[ndims];
             for (int i = 0; i != ndims; i++)
@@ -156,7 +160,7 @@ int double_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
             }
             sciprint(")\n");
 
-            jl_value_t *array_type = jl_apply_array_type(jl_float64_type, ndims);
+            jl_value_t *array_type = jl_apply_array_type((jl_value_t*)jl_float64_type, ndims);
 
             // *ret = jl_alloc_array_2d(array_type, m, n);
             // double *xData = (double*) jl_array_data(ret);
@@ -224,7 +228,7 @@ int double_jl_to_sci(jl_value_t *input, int position) {
         }
         sciprint(")\n");
 
-        if(jl_typeis(matrix, jl_apply_array_type(jl_float64_type, ndims))) {
+        if(jl_typeis(matrix, jl_apply_array_type((jl_value_t*)jl_float64_type, ndims))) {
             double *data;
 
             sciprint("double_jl_to_sci: argument #%d: Matrix Double\n", position);
@@ -246,7 +250,7 @@ int double_jl_to_sci(jl_value_t *input, int position) {
                 return 0;
             }
         }
-        else if (jl_typeis(matrix, jl_apply_array_type((jl_datatype_t*)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims))) {
+        else if (jl_typeis(matrix, jl_apply_array_type(jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&jl_float64_type, 1), ndims))) {
             sciprint("double_jl_to_sci: argument #%d: Matrix Complex Double\n", position);
             double complex *jl_data = (double complex *) jl_array_data(matrix);
             // double complex ** data = (double complex **) jl_array_data(matrix);
@@ -300,7 +304,7 @@ int double_jl_to_sci(jl_value_t *input, int position) {
             return 0;
         }
     }
-    else if (jl_typeis(input, jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)))) {
+    else if (jl_typeis(input, jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&jl_float64_type, 1))) {
         complex double *data = (complex double*) input;
         double real = creal(*data);
         double imag = cimag(*data);

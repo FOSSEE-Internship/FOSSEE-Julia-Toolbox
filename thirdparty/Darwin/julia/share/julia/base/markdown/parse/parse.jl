@@ -1,6 +1,6 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-type MD
+mutable struct MD
     content::Vector{Any}
     meta::Dict{Any, Any}
 
@@ -56,7 +56,7 @@ function parseinline(stream::IO, md::MD, config::Config)
         char = Char(peek(stream))
         if haskey(config.inner, char) &&
                 (inner = parseinline(stream, md, config.inner[char])) !== nothing
-            c = takebuf_string(buffer)
+            c = String(take!(buffer))
             !isempty(c) && push!(content, c)
             buffer = IOBuffer()
             push!(content, inner)
@@ -64,17 +64,13 @@ function parseinline(stream::IO, md::MD, config::Config)
             write(buffer, read(stream, Char))
         end
     end
-    c = takebuf_string(buffer)
+    c = String(take!(buffer))
     !isempty(c) && push!(content, c)
     return content
 end
 
 parseinline(s::AbstractString, md::MD, c::Config) =
     parseinline(IOBuffer(s), md, c)
-
-# TODO remove once GH #9888 is fixed
-parseinline{T}(s::SubString{T}, md::MD, c::Config) =
-    parseinline(convert(T, s), md, c)
 
 parseinline(s, md::MD) = parseinline(s, md, config(md))
 

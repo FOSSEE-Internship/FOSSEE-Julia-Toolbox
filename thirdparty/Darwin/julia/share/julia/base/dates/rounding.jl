@@ -27,7 +27,7 @@ epochms2datetime(i) = DateTime(UTM(DATETIMEEPOCH + Int64(i)))
     date2epochdays(dt::Date) -> Int64
 
 Takes the given `Date` and returns the number of days since the rounding epoch
-(`0000-01-01T00:00:00`) as an `Int64`.
+(`0000-01-01T00:00:00`) as an [`Int64`](@ref).
 """
 date2epochdays(dt::Date) = value(dt) - DATEEPOCH
 
@@ -35,7 +35,7 @@ date2epochdays(dt::Date) = value(dt) - DATEEPOCH
     datetime2epochms(dt::DateTime) -> Int64
 
 Takes the given `DateTime` and returns the number of milliseconds since the rounding epoch
-(`0000-01-01T00:00:00`) as an `Int64`.
+(`0000-01-01T00:00:00`) as an [`Int64`](@ref).
 """
 datetime2epochms(dt::DateTime) = value(dt) - DATETIMEEPOCH
 
@@ -172,9 +172,9 @@ Base.round(::TimeType, ::Period, ::RoundingMode) = throw(DomainError())
 Base.round(dt::TimeType, p::Period) = Base.round(dt, p, RoundNearestTiesUp)
 
 # Make rounding functions callable using Period types in addition to values.
-Base.floor{T <: Period}(dt::TimeType, p::Type{T}) = Base.floor(dt, p(1))
-Base.ceil{T <: Period}(dt::TimeType, p::Type{T}) = Base.ceil(dt, p(1))
+Base.floor(dt::TimeType, p::Type{<:Period}) = Base.floor(dt, p(1))
+Base.ceil(dt::TimeType, p::Type{<:Period}) = Base.ceil(dt, p(1))
 
-function Base.round{T<:Period}(dt::TimeType, p::Type{T}, r::RoundingMode=RoundNearestTiesUp)
+function Base.round(dt::TimeType, p::Type{<:Period}, r::RoundingMode=RoundNearestTiesUp)
     return Base.round(dt, p(1), r)
 end

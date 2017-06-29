@@ -11,7 +11,7 @@ elseif is_windows()
     # GetLongPathName Win32 function returns the case-preserved filename on NTFS.
     function isfile_casesensitive(path)
         isfile(path) || return false  # Fail fast
-        Filesystem.longpath(path) == path
+        basename(Filesystem.longpath(path)) == basename(path)
     end
 elseif is_apple()
     # HFS+ filesystem is case-preserving. The getattrlist API returns
@@ -47,7 +47,7 @@ elseif is_apple()
         path_basename = String(basename(path))
         local casepreserved_basename
         const header_size = 12
-        buf = Array{UInt8}(length(path_basename) + header_size + 1)
+        buf = Vector{UInt8}(length(path_basename) + header_size + 1)
         while true
             ret = ccall(:getattrlist, Cint,
                         (Cstring, Ptr{Void}, Ptr{Void}, Csize_t, Culong),
@@ -64,12 +64,12 @@ elseif is_apple()
             break
         end
         # Hack to compensate for inability to create a string from a subarray with no allocations.
-        path_basename.data == casepreserved_basename && return true
+        Vector{UInt8}(path_basename) == casepreserved_basename && return true
 
         # If there is no match, it's possible that the file does exist but HFS+
         # performed unicode normalization. See  https://developer.apple.com/library/mac/qa/qa1235/_index.html.
         isascii(path_basename) && return false
-        normalize_string(path_basename, :NFD).data == casepreserved_basename
+        Vector{UInt8}(normalize_string(path_basename, :NFD)) == casepreserved_basename
     end
 else
     # Generic fallback that performs a slow directory listing.
@@ -80,19 +80,26 @@ else
     end
 end
 
-function try_path(prefix::String, base::String, name::String)
-    path = joinpath(prefix, name)
+function load_hook(prefix::String, name::String, ::Void)
+    name_jl = "$name.jl"
+    path = joinpath(prefix, name_jl)
     isfile_casesensitive(path) && return abspath(path)
-    path = joinpath(prefix, base, "src", name)
+    path = joinpath(prefix, name_jl, "src", name_jl)
     isfile_casesensitive(path) && return abspath(path)
-    path = joinpath(prefix, name, "src", name)
+    path = joinpath(prefix, name, "src", name_jl)
     isfile_casesensitive(path) && return abspath(path)
     return nothing
 end
+load_hook(prefix::String, name::String, path::String) = path
+load_hook(prefix, name::String, ::Any) =
+    throw(ArgumentError("unrecognized custom loader in LOAD_PATH: $prefix"))
+
+_str(x::AbstractString) = String(x)
+_str(x) = x
 
 # `wd` is a working directory to search. defaults to current working directory.
 # if `wd === nothing`, no extra path is searched.
-function find_in_path(name::String, wd)
+function find_in_path(name::String, wd::Union{Void,String})
     isabspath(name) && return name
     base = name
     if endswith(name,".jl")
@@ -103,15 +110,15 @@ function find_in_path(name::String, wd)
     if wd !== nothing
         isfile_casesensitive(joinpath(wd,name)) && return joinpath(wd,name)
     end
-    p = try_path(Pkg.dir(), base, name)
-    p !== nothing && return p
-    for prefix in LOAD_PATH
-        p = try_path(prefix, base, name)
-        p !== nothing && return p
+    path = nothing
+    path = _str(load_hook(_str(Pkg.dir()), base, path))
+    for dir in LOAD_PATH
+        path = _str(load_hook(_str(dir), base, path))
     end
-    return nothing
+    return path
 end
-find_in_path(name::AbstractString, wd = pwd()) = find_in_path(String(name), wd)
+find_in_path(name::AbstractString, wd::AbstractString = pwd()) =
+    find_in_path(String(name), String(wd))
 
 function find_in_node_path(name::String, srcpath, node::Int=1)
     if myid() == node
@@ -165,19 +172,25 @@ function _require_from_serialized(node::Int, mod::Symbol, path_to_try::String, t
         end
         restored = _include_from_serialized(content)
         isa(restored, Exception) && return restored
-        others = filter(x -> x != myid(), procs())
-        refs = Any[
-            (p, @spawnat(p,
-                let m = try
-                            _include_from_serialized(content)
-                        catch ex
-                            isa(ex, Exception) ? ex : ErrorException(string(ex))
+
+        results = sizehint!(Vector{Tuple{Int,Any}}(), nprocs())
+        @sync for p in procs()
+            if p != myid()
+                @async begin
+                    result = remotecall_fetch(p) do
+                        let m = try
+                                    _include_from_serialized(content)
+                                catch ex
+                                    isa(ex, Exception) ? ex : ErrorException(string(ex))
+                                end
+                            isa(m, Exception) ? m : nothing
                         end
-                    isa(m, Exception) ? m : nothing
-                end))
-            for p in others ]
-        for (id, ref) in refs
-            m = fetch(ref)
+                    end
+                    push!(results, (p, result))
+                end
+            end
+        end
+        for (id, m) in results
             if m !== nothing
                 warn("Node state is inconsistent: node $id failed to load cache from $path_to_try. Got:")
                 warn(m, prefix="WARNING: ")
@@ -211,8 +224,14 @@ function _require_search_from_serialized(node::Int, mod::Symbol, sourcepath::Str
     end
 
     for path_to_try in paths::Vector{String}
-        if stale_cachefile(sourcepath, path_to_try)
-            continue
+        if node == myid()
+            if stale_cachefile(sourcepath, path_to_try)
+                continue
+            end
+        else
+            if @fetchfrom node stale_cachefile(sourcepath, path_to_try)
+                continue
+            end
         end
         restored = _require_from_serialized(node, mod, path_to_try, toplevel_load)
         if isa(restored, Exception)
@@ -239,6 +258,11 @@ const DEBUG_LOADING = Ref(false)
 # to synchronize multiple tasks trying to import/using something
 const package_locks = Dict{Symbol,Condition}()
 
+# to notify downstream consumers that a module was successfully loaded
+# Callbacks take the form (mod::Symbol) -> nothing.
+# WARNING: This is an experimental feature and might change later, without deprecation.
+const package_callbacks = Any[]
+
 # used to optionally track dependencies when requiring a module:
 const _concrete_dependencies = Any[] # these dependency versions are "set in stone", and the process should try to avoid invalidating them
 const _require_dependencies = Any[] # a list of (path, mtime) tuples that are the file dependencies of the module currently being precompiled
@@ -252,6 +276,17 @@ function _include_dependency(_path::AbstractString)
     end
     return path, prev
 end
+
+"""
+    include_dependency(path::AbstractString)
+
+In a module, declare that the file specified by `path` (relative or absolute) is a
+dependency for precompilation; that is, the module will need to be recompiled if this file
+changes.
+
+This is only needed if your module depends on a file that is not used via `include`. It has
+no effect outside of compilation.
+"""
 function include_dependency(path::AbstractString)
     _include_dependency(path)
     return nothing
@@ -259,7 +294,7 @@ end
 
 # We throw PrecompilableError(true) when a module wants to be precompiled but isn't,
 # and PrecompilableError(false) when a module doesn't want to be precompiled but is
-immutable PrecompilableError <: Exception
+struct PrecompilableError <: Exception
     isprecompilable::Bool
 end
 function show(io::IO, ex::PrecompilableError)
@@ -339,7 +374,35 @@ end
 
 # require always works in Main scope and loads files from node 1
 toplevel_load = true
+
+"""
+    require(module::Symbol)
+
+This function is part of the implementation of `using` / `import`, if a module is not
+already defined in `Main`. It can also be called directly to force reloading a module,
+regardless of whether it has been loaded before (for example, when interactively developing
+libraries).
+
+Loads a source file, in the context of the `Main` module, on every active node, searching
+standard locations for files. `require` is considered a top-level operation, so it sets the
+current `include` path but does not use it to search for files (see help for `include`).
+This function is typically used to load library code, and is implicitly called by `using` to
+load packages.
+
+When searching for files, `require` first looks for package code under `Pkg.dir()`,
+then tries paths in the global array `LOAD_PATH`. `require` is case-sensitive on
+all platforms, including those with case-insensitive filesystems like macOS and
+Windows.
+"""
 function require(mod::Symbol)
+    _require(mod::Symbol)
+    # After successfully loading notify downstream consumers
+    for callback in package_callbacks
+        invokelatest(callback, mod)
+    end
+end
+
+function _require(mod::Symbol)
     # dependency-tracking is only used for one top-level include(path),
     # and is not applied recursively to imported modules:
     old_track_dependencies = _track_dependencies[]
@@ -409,8 +472,13 @@ function require(mod::Symbol)
                 eval(Main, :(Base.include_from_node1($path)))
 
                 # broadcast top-level import/using from node 1 (only)
-                refs = Any[ @spawnat p eval(Main, :(Base.include_from_node1($path))) for p in filter(x -> x != 1, procs()) ]
-                for r in refs; wait(r); end
+                @sync begin
+                    for p in filter(x -> x != 1, procs())
+                        @async remotecall_fetch(p) do
+                            eval(Main, :(Base.include_from_node1($path); nothing))
+                        end
+                    end
+                end
             else
                 eval(Main, :(Base.include_from_node1($path)))
             end
@@ -438,6 +506,12 @@ end
 
 # remote/parallel load
 
+"""
+    include_string(code::AbstractString, filename::AbstractString="string")
+
+Like `include`, except reads code from the given string rather than from a file. Since there
+is no file path involved, no path processing or fetching from node 1 is done.
+"""
 include_string(txt::String, fname::String) =
     ccall(:jl_load_file_string, Any, (Ptr{UInt8},Csize_t,Cstring),
           txt, sizeof(txt), fname)
@@ -449,10 +523,10 @@ function source_path(default::Union{AbstractString,Void}="")
     t = current_task()
     while true
         s = t.storage
-        if !is(s, nothing) && haskey(s, :SOURCE_PATH)
+        if s !== nothing && haskey(s, :SOURCE_PATH)
             return s[:SOURCE_PATH]
         end
-        if is(t, t.parent)
+        if t === t.parent
             return default
         end
         t = t.parent
@@ -464,17 +538,24 @@ function source_dir()
     p === nothing ? p : dirname(p)
 end
 
+"""
+    @__FILE__ -> AbstractString
+
+`@__FILE__` expands to a string with the absolute file path of the file containing the
+macro. Returns `nothing` if run from a REPL or an empty string if evaluated by
+`julia -e <expr>`. Alternatively see [`PROGRAM_FILE`](@ref).
+"""
 macro __FILE__() source_path() end
 
 """
-    include(path::AbstractString)
+    @__DIR__ -> AbstractString
 
-Evaluate the contents of a source file in the current context. During including, a
-task-local include path is set to the directory containing the file. Nested calls to
-`include` will search relative to that path. All paths refer to files on node 1 when running
-in parallel, and files will be fetched from node 1. This function is typically used to load
-source interactively, or to combine files in packages that are broken into multiple source files.
+`@__DIR__` expands to a string with the directory part of the absolute path of the file
+containing the macro. Returns `nothing` if run from a REPL or an empty string if
+evaluated by `julia -e <expr>`.
 """
+macro __DIR__() source_dir() end
+
 include_from_node1(path::AbstractString) = include_from_node1(String(path))
 function include_from_node1(_path::String)
     path, prev = _include_dependency(_path)
@@ -500,6 +581,24 @@ function include_from_node1(_path::String)
     result
 end
 
+"""
+    include(path::AbstractString)
+
+Evaluate the contents of the input source file in the current context. Returns the result
+of the last evaluated expression of the input file. During including, a task-local include
+path is set to the directory containing the file. Nested calls to `include` will search
+relative to that path. All paths refer to files on node 1 when running in parallel, and
+files will be fetched from node 1. This function is typically used to load source
+interactively, or to combine files in packages that are broken into multiple source files.
+"""
+include # defined in sysimg.jl
+
+"""
+    evalfile(path::AbstractString, args::Vector{String}=String[])
+
+Load the file using [`include`](@ref), evaluate all expressions,
+and return the value of the last one.
+"""
 function evalfile(path::AbstractString, args::Vector{String}=String[])
     return eval(Module(:__anon__),
                 Expr(:toplevel,
@@ -556,6 +655,17 @@ function create_expr_cache(input::String, output::String, concrete_deps::Vector{
 end
 
 compilecache(mod::Symbol) = compilecache(string(mod))
+
+"""
+    Base.compilecache(module::String)
+
+Creates a precompiled cache file for
+a module and all of its dependencies.
+This can be used to reduce package load times. Cache files are stored in
+`LOAD_CACHE_PATH[1]`, which defaults to `~/.julia/lib/VERSION`. See
+[Module initialization and precompilation](@ref)
+for important notes.
+"""
 function compilecache(name::String)
     myid() == 1 || error("can only precompile from node 1")
     # decide where to get the source file from
@@ -701,8 +811,9 @@ function stale_cachefile(modpath::String, cachefile::String)
         end
         for (f, ftime_req) in files
             # Issue #13606: compensate for Docker images rounding mtimes
+            # Issue #20837: compensate for GlusterFS truncating mtimes to microseconds
             ftime = mtime(f)
-            if ftime != ftime_req && ftime != floor(ftime_req)
+            if ftime != ftime_req && ftime != floor(ftime_req) && ftime != trunc(ftime_req, 6)
                 DEBUG_LOADING[] && info("JL_DEBUG_LOADING: Rejecting stale cache file $cachefile (mtime $ftime_req) because file $f (mtime $ftime) has changed.")
                 return true
             end

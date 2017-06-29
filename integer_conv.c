@@ -197,24 +197,24 @@ int int_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         
         if (precision > 10){
             if(precision%10 == 1){
-                array_type = jl_apply_array_type(jl_uint8_type, ndims);
+                array_type = jl_apply_array_type((jl_value_t*)jl_uint8_type, ndims);
             }
             else if(precision%10 == 2){
-                array_type = jl_apply_array_type(jl_uint16_type, ndims);
+                array_type = jl_apply_array_type((jl_value_t*)jl_uint16_type, ndims);
             }
             else if(precision%10 == 4){
-                array_type = jl_apply_array_type(jl_uint32_type, ndims);
+                array_type = jl_apply_array_type((jl_value_t*)jl_uint32_type, ndims);
             }
         }
         else {
             if(precision%10 == 1){
-                array_type = jl_apply_array_type(jl_int8_type, ndims);
+                array_type = jl_apply_array_type((jl_value_t*)jl_int8_type, ndims);
             }
             else if(precision%10 == 2){
-                array_type = jl_apply_array_type(jl_int16_type, ndims);
+                array_type = jl_apply_array_type((jl_value_t*)jl_int16_type, ndims);
             }
             else if(precision%10 == 4){
-                array_type = jl_apply_array_type(jl_int32_type, ndims);
+                array_type = jl_apply_array_type((jl_value_t*)jl_int32_type, ndims);
             }
         }
 
@@ -297,7 +297,7 @@ int int_jl_to_sci(jl_value_t *input, int position) {
             }
             sciprint(")\n");
 
-            if(jl_typeis(input, jl_apply_array_type(jl_int8_type, ndims))) {
+            if(jl_typeis(input, jl_apply_array_type((jl_value_t*)jl_int8_type, ndims))) {
                 int8_t *data = (int8_t*) jl_array_data(matrix);
                 if (jl_exception_occurred())
                     sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
@@ -307,7 +307,7 @@ int int_jl_to_sci(jl_value_t *input, int position) {
                 else 
                     sciErr = createHypermatOfInteger8(pvApiCtx, position, dims, ndims, data);
             }
-            else if(jl_typeis(input, jl_apply_array_type(jl_int16_type, ndims))) {
+            else if(jl_typeis(input, jl_apply_array_type((jl_value_t*)jl_int16_type, ndims))) {
                 int16_t *data = (int16_t*) jl_array_data(matrix);
                 if (jl_exception_occurred())
                     sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
@@ -317,7 +317,7 @@ int int_jl_to_sci(jl_value_t *input, int position) {
                 else 
                     sciErr = createHypermatOfInteger16(pvApiCtx, position, dims, ndims, data);
             }
-            else if(jl_typeis(input, jl_apply_array_type(jl_int32_type, ndims))) {
+            else if(jl_typeis(input, jl_apply_array_type((jl_value_t*)jl_int32_type, ndims))) {
                 int32_t *data = (int32_t*) jl_array_data(matrix);
                 if (jl_exception_occurred())
                     sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
@@ -327,7 +327,7 @@ int int_jl_to_sci(jl_value_t *input, int position) {
                 else 
                     sciErr = createHypermatOfInteger32(pvApiCtx, position, dims, ndims, data);
             }
-            else if(jl_typeis(input, jl_apply_array_type(jl_int64_type, ndims))) {
+            else if(jl_typeis(input, jl_apply_array_type((jl_value_t*)jl_int64_type, ndims))) {
                 int32_t *data = (int32_t*) jl_array_data(matrix);
                 if (jl_exception_occurred())
                     sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
@@ -338,7 +338,7 @@ int int_jl_to_sci(jl_value_t *input, int position) {
                 else 
                     sciErr = createHypermatOfInteger32(pvApiCtx, position, dims, ndims, data);
             }
-            else if(jl_typeis(input, jl_apply_array_type(jl_uint8_type, ndims))) {
+            else if(jl_typeis(input, jl_apply_array_type((jl_value_t*)jl_uint8_type, ndims))) {
                 uint8_t *data = (uint8_t*) jl_array_data(matrix);
                 if (jl_exception_occurred())
                     sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
@@ -348,7 +348,7 @@ int int_jl_to_sci(jl_value_t *input, int position) {
                 else 
                     sciErr = createHypermatOfUnsignedInteger8(pvApiCtx, position, dims, ndims, data);
             }
-            else if(jl_typeis(input, jl_apply_array_type(jl_uint16_type, ndims))) {
+            else if(jl_typeis(input, jl_apply_array_type((jl_value_t*)jl_uint16_type, ndims))) {
                 uint16_t *data = (uint16_t*) jl_array_data(matrix);
                 if (jl_exception_occurred())
                     sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
@@ -358,7 +358,7 @@ int int_jl_to_sci(jl_value_t *input, int position) {
                 else 
                     sciErr = createHypermatOfUnsignedInteger16(pvApiCtx, position, dims, ndims, data);
             }
-            else if(jl_typeis(input, jl_apply_array_type(jl_uint32_type, ndims))) {
+            else if(jl_typeis(input, jl_apply_array_type((jl_value_t*)jl_uint32_type, ndims))) {
                 uint32_t *data = (uint32_t*) jl_array_data(matrix);
                 if (jl_exception_occurred())
                     sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
@@ -368,7 +368,7 @@ int int_jl_to_sci(jl_value_t *input, int position) {
                 else 
                     sciErr = createHypermatOfUnsignedInteger32(pvApiCtx, position, dims, ndims, data);
             }
-            else if(jl_typeis(input, jl_apply_array_type(jl_uint64_type, ndims))) {
+            else if(jl_typeis(input, jl_apply_array_type((jl_value_t*)jl_uint64_type, ndims))) {
                 uint32_t *data = (uint32_t*) jl_array_data(matrix);
                 if (jl_exception_occurred())
                     sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));

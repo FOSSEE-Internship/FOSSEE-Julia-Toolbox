@@ -87,28 +87,28 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
             if(jl_is_array(newargs)) {
                 int ndims = jl_array_ndims(newargs);
 
-                if (jl_typeis(newargs, jl_apply_array_type(jl_float64_type, ndims)) || 
-                jl_typeis(newargs, jl_apply_array_type((jl_datatype_t*)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims)) ) {
+                if (jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_float64_type, ndims)) || 
+                jl_typeis(newargs, jl_apply_array_type(jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&(jl_float64_type), 1), ndims)) ) {
                     sciprint("%s: Float variable\n", fname);
                     err = double_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
-                else if (jl_typeis(newargs, jl_apply_array_type(jl_bool_type, ndims))) {
+                else if (jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims))) {
                     sciprint("%s: Boolean variable\n", fname);
                     err = bool_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
-                else if (jl_typeis(newargs, jl_apply_array_type(jl_int8_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_uint8_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_int16_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_uint16_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_int32_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_uint32_type, ndims)) ||
-                    jl_typeis(newargs, jl_apply_array_type(jl_int64_type, ndims)) ||
-                    jl_typeis(newargs, jl_apply_array_type(jl_uint64_type, ndims)) ) {
+                else if (jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_int8_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_uint8_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_int16_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_uint16_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_int32_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_uint32_type, ndims)) ||
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_int64_type, ndims)) ||
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_uint64_type, ndims)) ) {
 
                     sciprint("%s: Integer variable\n", fname);
                     err = int_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
-                else if (jl_typeis(newargs, jl_apply_array_type(jl_string_type, ndims))) {
+                else if (jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_string_type, ndims))) {
 
                     sciprint("%s: String variable\n", fname);
                     err = string_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
@@ -116,7 +116,7 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
             }
             else {
                 if(jl_typeis(newargs, jl_float64_type) || 
-                jl_typeis(newargs, jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)))) {
+                jl_typeis(newargs, jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&(jl_float64_type), 1))) {
                     sciprint("%s: Float variable\n", fname);
                     err = double_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
@@ -166,28 +166,28 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
         if(jl_is_array(ret)) {
             int ndims = jl_array_ndims(ret);
 
-            if (jl_typeis(ret, jl_apply_array_type(jl_float64_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type((jl_datatype_t*)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims)) ) {
+            if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_float64_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type(jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&(jl_float64_type), 1), ndims)) ) {
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
-            else if (jl_typeis(ret, jl_apply_array_type(jl_bool_type, ndims))) {
+            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims))) {
                 sciprint("%s: Boolean variable\n", fname);
                 err = bool_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
-            else if (jl_typeis(ret, jl_apply_array_type(jl_int8_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_uint8_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_int16_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_uint16_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_int32_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_uint32_type, ndims)) ||
-                jl_typeis(ret, jl_apply_array_type(jl_int64_type, ndims)) ||
-                jl_typeis(ret, jl_apply_array_type(jl_uint64_type, ndims)) ) {
+            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_int8_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_uint8_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_int16_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_uint16_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_int32_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_uint32_type, ndims)) ||
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_int64_type, ndims)) ||
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_uint64_type, ndims)) ) {
 
                 sciprint("%s: Integer variable\n", fname);
                 err = int_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
-            else if (jl_typeis(ret, jl_apply_array_type(jl_string_type, ndims))) {
+            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_string_type, ndims))) {
 
                 sciprint("%s: String variable\n", fname);
                 err = string_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
@@ -195,7 +195,7 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
         }
         else {
             if(jl_typeis(ret, jl_float64_type) || 
-                jl_typeis(ret, jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)))) {
+                jl_typeis(ret, jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&(jl_float64_type), 1))) {
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
@@ -397,28 +397,28 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             if(jl_is_array(newargs)) {
                 int ndims = jl_array_ndims(newargs);
 
-                if (jl_typeis(newargs, jl_apply_array_type(jl_float64_type, ndims)) || 
-                jl_typeis(newargs, jl_apply_array_type((jl_datatype_t*)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims)) ) {
+                if (jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_float64_type, ndims)) || 
+                jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&(jl_float64_type), 1), ndims)) ) {
                     sciprint("%s: Float variable\n", fname);
                     err = double_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
-                else if (jl_typeis(newargs, jl_apply_array_type(jl_bool_type, ndims))) {
+                else if (jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims))) {
                     sciprint("%s: Boolean variable\n", fname);
                     err = bool_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
-                else if (jl_typeis(newargs, jl_apply_array_type(jl_int8_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_uint8_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_int16_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_uint16_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_int32_type, ndims)) || 
-                    jl_typeis(newargs, jl_apply_array_type(jl_uint32_type, ndims)) ||
-                    jl_typeis(newargs, jl_apply_array_type(jl_int64_type, ndims)) ||
-                    jl_typeis(newargs, jl_apply_array_type(jl_uint64_type, ndims)) ) {
+                else if (jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_int8_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_uint8_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_int16_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_uint16_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_int32_type, ndims)) || 
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_uint32_type, ndims)) ||
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_int64_type, ndims)) ||
+                    jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_uint64_type, ndims)) ) {
 
                     sciprint("%s: Integer variable\n", fname);
                     err = int_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
-                else if (jl_typeis(newargs, jl_apply_array_type(jl_string_type, ndims))) {
+                else if (jl_typeis(newargs, jl_apply_array_type((jl_value_t*)jl_string_type, ndims))) {
 
                     sciprint("%s: String variable\n", fname);
                     err = string_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
@@ -426,7 +426,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             }
             else {
                 if(jl_typeis(newargs, jl_float64_type) || 
-                jl_typeis(newargs, jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)))) {
+                jl_typeis(newargs, jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&(jl_float64_type), 1))) {
                     sciprint("%s: Float variable\n", fname);
                     err = double_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
                 }
@@ -476,28 +476,28 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         if(jl_is_array(ret)) {
             int ndims = jl_array_ndims(ret);
 
-            if (jl_typeis(ret, jl_apply_array_type(jl_float64_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type((jl_datatype_t*)jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)), ndims)) ) {
+            if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_float64_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&(jl_float64_type), 1), ndims)) ) {
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
-            else if (jl_typeis(ret, jl_apply_array_type(jl_bool_type, ndims))) {
+            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims))) {
                 sciprint("%s: Boolean variable\n", fname);
                 err = bool_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
-            else if (jl_typeis(ret, jl_apply_array_type(jl_int8_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_uint8_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_int16_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_uint16_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_int32_type, ndims)) || 
-                jl_typeis(ret, jl_apply_array_type(jl_uint32_type, ndims)) ||
-                jl_typeis(ret, jl_apply_array_type(jl_int64_type, ndims)) ||
-                jl_typeis(ret, jl_apply_array_type(jl_uint64_type, ndims)) ) {
+            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_int8_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_uint8_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_int16_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_uint16_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_int32_type, ndims)) || 
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_uint32_type, ndims)) ||
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_int64_type, ndims)) ||
+                jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_uint64_type, ndims)) ) {
 
                 sciprint("%s: Integer variable\n", fname);
                 err = int_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
-            else if (jl_typeis(ret, jl_apply_array_type(jl_string_type, ndims))) {
+            else if (jl_typeis(ret, jl_apply_array_type((jl_value_t*)jl_string_type, ndims))) {
 
                 sciprint("%s: String variable\n", fname);
                 err = string_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
@@ -505,7 +505,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
         }
         else {
             if(jl_typeis(ret, jl_float64_type) || 
-                jl_typeis(ret, jl_apply_type((jl_value_t*)jl_complex_type, jl_svec1(jl_float64_type)))) {
+                jl_typeis(ret, jl_apply_type((jl_value_t*)jl_complex_type, (jl_value_t**)&(jl_float64_type), 1))) {
                 sciprint("%s: Float variable\n", fname);
                 err = double_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
@@ -530,7 +530,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
                 sciprint("%s: String variable\n", fname);
                 err = string_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }
-            else if (jl_typeis(ret, jl_get_global(jl_base_module, jl_symbol("SparseMatrixCSC")))) {
+            else if (jl_isa(ret, jl_get_global(jl_base_module, jl_symbol("SparseMatrixCSC")))) {
                 sciprint("%s: SparseMatrixCSC variable\n", fname);
                 err = sparse_jl_to_sci(ret, nbInputArgument(pvApiCtx) + 1);
             }

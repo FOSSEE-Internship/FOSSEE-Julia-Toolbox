@@ -63,7 +63,7 @@ int bool_sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         sciprint(")\n");
         
 
-        jl_value_t *array_type = jl_apply_array_type(jl_bool_type, ndims);
+        jl_value_t *array_type = jl_apply_array_type((jl_value_t*)jl_bool_type, ndims);
 
         // copying data to julia data structure
         int8_t *xData = (int8_t*) malloc(sizeof(int8_t) * len);
@@ -110,7 +110,7 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
         // Get number of dimensions
         int ndims = jl_array_ndims(matrix);
 
-        if (jl_typeis(matrix, jl_apply_array_type(jl_bool_type, ndims))) {
+        if (jl_typeis(matrix, jl_apply_array_type((jl_value_t*)jl_bool_type, ndims))) {
             // Get the size of the matrix
             int dims[ndims];
             int len = jl_array_len(matrix);

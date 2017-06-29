@@ -2,11 +2,12 @@
 
 using Base.REPLCompletions
 
-module CompletionFoo
-    type Test_y
+ex = quote
+    module CompletionFoo
+    mutable struct Test_y
         yy
     end
-    type Test_x
+    mutable struct Test_x
         xx :: Test_y
     end
     type_test = Test_x(Test_y(1))
@@ -21,7 +22,7 @@ module CompletionFoo
     end
 
     # Support non-Dict Associatives, #19441
-    type CustomDict{K, V} <: Associative{K, V}
+    mutable struct CustomDict{K, V} <: Associative{K, V}
         mydict::Dict{K, V}
     end
 
@@ -63,9 +64,12 @@ module CompletionFoo
                      contains=>4, `ls`=>5, 66=>7, 67=>8, ("q",3)=>11,
                      "α"=>12, :α=>13)
     test_customdict = CustomDict(test_dict)
+    end
+    test_repl_comp_dict = CompletionFoo.test_dict
+    test_repl_comp_customdict = CompletionFoo.test_customdict
 end
-test_repl_comp_dict = CompletionFoo.test_dict
-test_repl_comp_customdict = CompletionFoo.test_customdict
+ex.head = :toplevel
+eval(Main, ex)
 
 function temp_pkg_dir_noinit(fn::Function)
     # Used in tests below to set up and tear down a sandboxed package directory
@@ -236,7 +240,7 @@ end
 s = "CompletionFoo.test(1,1, "
 c, r, res = test_complete(s)
 @test !res
-@test c[1] == string(first(methods(CompletionFoo.test, Tuple{Int, Int})))
+@test c[1] == string(first(methods(Main.CompletionFoo.test, Tuple{Int, Int})))
 @test length(c) == 3
 @test r == 1:18
 @test s[r] == "CompletionFoo.test"
@@ -244,7 +248,7 @@ c, r, res = test_complete(s)
 s = "CompletionFoo.test(CompletionFoo.array,"
 c, r, res = test_complete(s)
 @test !res
-@test c[1] == string(first(methods(CompletionFoo.test, Tuple{Array{Int, 1}, Any})))
+@test c[1] == string(first(methods(Main.CompletionFoo.test, Tuple{Array{Int, 1}, Any})))
 @test length(c) == 2
 @test r == 1:18
 @test s[r] == "CompletionFoo.test"
@@ -252,7 +256,7 @@ c, r, res = test_complete(s)
 s = "CompletionFoo.test(1,1,1,"
 c, r, res = test_complete(s)
 @test !res
-@test c[1] == string(first(methods(CompletionFoo.test, Tuple{Any, Any, Any})))
+@test c[1] == string(first(methods(Main.CompletionFoo.test, Tuple{Any, Any, Any})))
 @test r == 1:18
 @test s[r] == "CompletionFoo.test"
 
@@ -280,26 +284,26 @@ for (T, arg) in [(String,"\")\""),(Char, "')'")]
     s = "(1, CompletionFoo.test2($arg,"
     c, r, res = test_complete(s)
     @test length(c) == 1
-    @test c[1] == string(first(methods(CompletionFoo.test2, Tuple{T,})))
+    @test c[1] == string(first(methods(Main.CompletionFoo.test2, Tuple{T,})))
     @test r == 5:23
     @test s[r] == "CompletionFoo.test2"
 end
 
-s = "(1, CompletionFoo.test2(`)`,"
+s = "(1, CompletionFoo.test2(`')'`,"
 c, r, res = test_complete(s)
-@test c[1] == string(first(methods(CompletionFoo.test2, Tuple{Cmd})))
+@test c[1] == string(first(methods(Main.CompletionFoo.test2, Tuple{Cmd})))
 @test length(c) == 1
 
 s = "CompletionFoo.test3([1, 2] + CompletionFoo.varfloat,"
 c, r, res = test_complete(s)
 @test !res
-@test c[1] == string(first(methods(CompletionFoo.test3, Tuple{Array{Float64, 1}, Float64})))
+@test c[1] == string(first(methods(Main.CompletionFoo.test3, Tuple{Array{Float64, 1}, Float64})))
 @test length(c) == 1
 
 s = "CompletionFoo.test3([1.,2.], 1.,"
 c, r, res = test_complete(s)
 @test !res
-@test c[1] == string(first(methods(CompletionFoo.test3, Tuple{Array{Float64, 1}, Float64})))
+@test c[1] == string(first(methods(Main.CompletionFoo.test3, Tuple{Array{Float64, 1}, Float64})))
 @test r == 1:19
 @test length(c) == 1
 @test s[r] == "CompletionFoo.test3"
@@ -307,22 +311,25 @@ c, r, res = test_complete(s)
 s = "CompletionFoo.test4(\"e\",r\" \","
 c, r, res = test_complete(s)
 @test !res
-@test c[1] == string(first(methods(CompletionFoo.test4, Tuple{String, Regex})))
+@test c[1] == string(first(methods(Main.CompletionFoo.test4, Tuple{String, Regex})))
 @test r == 1:19
 @test length(c) == 1
 @test s[r] == "CompletionFoo.test4"
 
+# (As discussed in #19829, the Base.REPLCompletions.get_type function isn't
+#  powerful enough to analyze general dot calls because it can't handle
+#  anonymous-function evaluation.)
 s = "CompletionFoo.test5(push!(Base.split(\"\",' '),\"\",\"\").==\"\","
 c, r, res = test_complete(s)
 @test !res
-@test length(c) == 1
-@test c[1] == string(first(methods(CompletionFoo.test5, Tuple{BitArray{1}})))
+@test_broken length(c) == 1
+@test_broken c[1] == string(first(methods(Main.CompletionFoo.test5, Tuple{BitArray{1}})))
 
 s = "CompletionFoo.test4(CompletionFoo.test_y_array[1]()[1], CompletionFoo.test_y_array[1]()[2], "
 c, r, res = test_complete(s)
 @test !res
 @test length(c) == 1
-@test c[1] == string(first(methods(CompletionFoo.test4, Tuple{String, String})))
+@test c[1] == string(first(methods(Main.CompletionFoo.test4, Tuple{String, String})))
 
 # Test that string escaption is handled correct
 s = """CompletionFoo.test4("\\"","""
@@ -356,13 +363,13 @@ s = "\"\"."
 c,r = test_complete(s)
 @test length(c)==1
 @test r == (endof(s)+1):endof(s)
-@test c[1] == "data"
+@test c[1] == "len"
 
 s = "(\"\"*\"\")."
 c,r = test_complete(s)
 @test length(c)==1
 @test r == (endof(s)+1):endof(s)
-@test c[1] == "data"
+@test c[1] == "len"
 
 s = "CompletionFoo.test_y_array[1]."
 c,r = test_complete(s)
@@ -717,7 +724,7 @@ function test_dict_completion(dict_name)
     @test c == Any["66]"]
     s = "$dict_name[("
     c, r = test_complete(s)
-    @test c == Any["(\"q\",3)]"]
+    @test c == Any["(\"q\", 3)]"]
     s = "$dict_name[\"\\alp"
     c, r = test_complete(s)
     @test c == String["\\alpha"]

@@ -40,8 +40,21 @@ function requirements(reqs::Dict, fix::Dict, avail::Dict)
     reqs, bktrc
 end
 
+# Specialized copy for the avail argument below because the deepcopy is slow
+function availcopy(avail)
+    new_avail = similar(avail)
+    for (pkg, vers_avail) in avail
+        new_vers_avail = similar(vers_avail)
+        for (version, pkg_avail) in vers_avail
+            new_vers_avail[version] = copy(pkg_avail)
+        end
+        new_avail[pkg] = new_vers_avail
+    end
+    return new_avail
+end
+
 function dependencies(avail::Dict, fix::Dict = Dict{String,Fixed}("julia"=>Fixed(VERSION)))
-    avail = deepcopy(avail)
+    avail = availcopy(avail)
     conflicts = Dict{String,Set{String}}()
     for (fp,fx) in fix
         delete!(avail, fp)
@@ -79,7 +92,8 @@ function dependencies(avail::Dict, fix::Dict = Dict{String,Fixed}("julia"=>Fixed
     avail, conflicts
 end
 
-function partial_update_mask(instd::Dict{String,Tuple{VersionNumber,Bool}}, avail::Dict{String,Dict{VersionNumber,Available}}, upkgs::Set{String})
+function partial_update_mask(instd::Dict{String,Tuple{VersionNumber,Bool}},
+        avail::Dict{String,Dict{VersionNumber,Available}}, upkgs::Set{String})
     dont_update = Set{String}()
     isempty(upkgs) && return dont_update
     avail_new = deepcopy(avail)
@@ -163,11 +177,11 @@ function check_partial_updates(reqs::Requires,
     end
 end
 
-typealias PackageState Union{Void,VersionNumber}
+const PackageState = Union{Void,VersionNumber}
 
 function diff(have::Dict, want::Dict, avail::Dict, fixed::Dict)
-    change = Array{Tuple{String,Tuple{PackageState,PackageState}}}(0)
-    remove = Array{Tuple{String,Tuple{PackageState,PackageState}}}(0)
+    change = Vector{Tuple{String,Tuple{PackageState,PackageState}}}(0)
+    remove = Vector{Tuple{String,Tuple{PackageState,PackageState}}}(0)
 
     for pkg in collect(union(keys(have),keys(want)))
         h, w = haskey(have,pkg), haskey(want,pkg)
@@ -189,7 +203,7 @@ function check_requirements(reqs::Requires, deps::Dict{String,Dict{VersionNumber
         if !any(vn->(vn in vs), keys(deps[p]))
             remaining_vs = VersionSet()
             err_msg = "fixed packages introduce conflicting requirements for $p: \n"
-            available_list = sort(collect(keys(deps[p])))
+            available_list = sort!(collect(keys(deps[p])))
             for (p1,f1) in fix
                 f1r = f1.requires
                 haskey(f1r, p) || continue

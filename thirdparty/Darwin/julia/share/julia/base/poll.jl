@@ -20,7 +20,7 @@ end
 # libuv file watching event flags
 const UV_RENAME = 1
 const UV_CHANGE = 2
-immutable FileEvent
+struct FileEvent
     renamed::Bool
     changed::Bool
     timedout::Bool
@@ -31,7 +31,7 @@ FileEvent(flags::Integer) = FileEvent((flags & UV_RENAME) != 0,
                                   (flags & FD_TIMEDOUT) != 0)
 fetimeout() = FileEvent(false, false, true)
 
-immutable FDEvent
+struct FDEvent
     readable::Bool
     writable::Bool
     disconnect::Bool
@@ -57,7 +57,7 @@ fdtimeout() = FDEvent(false, false, false, true)
             a.disconnect | b.disconnect,
             a.timedout | b.timedout)
 
-type FileMonitor
+mutable struct FileMonitor
     handle::Ptr{Void}
     file::String
     notify::Condition
@@ -76,7 +76,7 @@ type FileMonitor
     end
 end
 
-type PollingFileWatcher
+mutable struct PollingFileWatcher
     handle::Ptr{Void}
     file::String
     interval::UInt32
@@ -96,7 +96,7 @@ type PollingFileWatcher
     end
 end
 
-type _FDWatcher
+mutable struct _FDWatcher
     handle::Ptr{Void}
     fdnum::Int # this is NOT the file descriptor
     refcount::Tuple{Int, Int}
@@ -195,7 +195,7 @@ type _FDWatcher
     end
 end
 
-type FDWatcher
+mutable struct FDWatcher
     watcher::_FDWatcher
     readable::Bool
     writable::Bool
@@ -431,6 +431,18 @@ function wait(m::FileMonitor)
     return filename, events
 end
 
+"""
+    poll_fd(fd, timeout_s::Real=-1; readable=false, writable=false)
+
+Monitor a file descriptor `fd` for changes in the read or write availability, and with a
+timeout given by `timeout_s` seconds.
+
+The keyword arguments determine which of read and/or write status should be monitored; at
+least one of them must be set to `true`.
+
+The returned value is an object with boolean fields `readable`, `writable`, and `timedout`,
+giving the result of the polling.
+"""
 function poll_fd(s::Union{RawFD, is_windows() ? WindowsRawSocket : Union{}}, timeout_s::Real=-1; readable=false, writable=false)
     wt = Condition()
     fdw = _FDWatcher(s, readable, writable)
@@ -459,6 +471,18 @@ function poll_fd(s::Union{RawFD, is_windows() ? WindowsRawSocket : Union{}}, tim
     end
 end
 
+"""
+    watch_file(path::AbstractString, timeout_s::Real=-1)
+
+Watch file or directory `path` for changes until a change occurs or `timeout_s` seconds have
+elapsed.
+
+The returned value is an object with boolean fields `changed`, `renamed`, and `timedout`,
+giving the result of watching the file.
+
+This behavior of this function varies slightly across platforms. See
+<https://nodejs.org/api/fs.html#fs_caveats> for more detailed information.
+"""
 function watch_file(s::AbstractString, timeout_s::Real=-1)
     wt = Condition()
     fm = FileMonitor(s)
@@ -487,6 +511,19 @@ function watch_file(s::AbstractString, timeout_s::Real=-1)
     end
 end
 
+"""
+    poll_file(path::AbstractString, interval_s::Real=5.007, timeout_s::Real=-1) -> (previous::StatStruct, current::StatStruct)
+
+Monitor a file for changes by polling every `interval_s` seconds until a change occurs or
+`timeout_s` seconds have elapsed. The `interval_s` should be a long period; the default is
+5.007 seconds.
+
+Returns a pair of `StatStruct` objects `(previous, current)` when a change is detected.
+
+To determine when a file was modified, compare `mtime(prev) != mtime(current)` to detect
+notification of changes. However, using [`watch_file`](@ref) for this operation is preferred, since
+it is more reliable and efficient, although in some situations it may not be available.
+"""
 function poll_file(s::AbstractString, interval_seconds::Real=5.007, timeout_s::Real=-1)
     wt = Condition()
     pfw = PollingFileWatcher(s, Float64(interval_seconds))
