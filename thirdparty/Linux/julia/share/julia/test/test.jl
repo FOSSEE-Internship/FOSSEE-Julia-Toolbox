@@ -7,6 +7,12 @@
 @test strip("\t  hi   \n") == "hi"
 @test strip("\t  this should fail   \n") != "hi"
 
+# @test should only evaluate the arguments once
+let g = Int[], f = (x) -> (push!(g, x); x)
+    @test f(1) == 1
+    @test g == [1]
+end
+
 # Test @test_broken with fail
 @test_broken false
 @test_broken 1 == 2
@@ -23,25 +29,31 @@
 @test_skip false
 @test_skip gobbeldygook
 
-a = Array(Float64, 2, 2, 2, 2, 2)
+# Test @test_warn
+@test 1234 === @test_nowarn(1234)
+@test 5678 === @test_warn("WARNING: foo", begin warn("foo"); 5678; end)
+let a
+    # Broken
+    # @test_throws UndefVarError a
+    # Replace with the previous line when #20016 is fixed
+    @test_throws UndefRefError a
+    @test_nowarn a = 1
+    @test a === 1
+end
+
+a = Array{Float64,5}(2, 2, 2, 2, 2)
 a[1,1,1,1,1] = 10
 @test a[1,1,1,1,1] == 10
 @test a[1,1,1,1,1] != 2
 
 @test rand() != rand()
 
-# Test printing of Pass results
-# Pass - constant
-@test contains(sprint(show, @test true), "Expression: true")
-# Pass - expression
-@test contains(sprint(show, @test 10 == 2*5), "Evaluated: 10 == 10")
-@test contains(sprint(show, @test !false), "Expression: !false")
 # Pass - exception
 @test contains(sprint(show, @test_throws ErrorException error()),
                 "Thrown: ErrorException")
 
 # Test printing of Fail results
-type NoThrowTestSet <: Base.Test.AbstractTestSet
+mutable struct NoThrowTestSet <: Base.Test.AbstractTestSet
     results::Vector
     NoThrowTestSet(desc) = new([])
 end
@@ -54,19 +66,49 @@ fails = @testset NoThrowTestSet begin
     @test_throws OverflowError 1 + 1
     # Fail - comparison
     @test 1+1 == 2+2
+    # Fail - approximate comparison
+    @test 1/1 ≈ 2/1
+    # Fail - chained comparison
+    @test 1+0 == 2+0 == 3+0
+    # Fail - comparison call
+    @test ==(1 - 2, 2 - 1)
     # Error - unexpected pass
     @test_broken true
 end
-for i in 1:3
+for i in 1:length(fails) - 1
     @test isa(fails[i], Base.Test.Fail)
 end
-@test contains(sprint(show, fails[1]), "Thrown: ErrorException")
-@test contains(sprint(show, fails[2]), "No exception thrown")
-@test contains(sprint(show, fails[3]), "Evaluated: 2 == 4")
-@test contains(sprint(show, fails[4]), "Unexpected Pass")
+
+str = sprint(show, fails[1])
+@test contains(str, "Expression: error()")
+@test contains(str, "Thrown: ErrorException")
+
+str = sprint(show, fails[2])
+@test contains(str, "Expression: 1 + 1")
+@test contains(str, "No exception thrown")
+
+str = sprint(show, fails[3])
+@test contains(str, "Expression: 1 + 1 == 2 + 2")
+@test contains(str, "Evaluated: 2 == 4")
+
+str = sprint(show, fails[4])
+@test contains(str, "Expression: 1 / 1 ≈ 2 / 1")
+@test contains(str, "Evaluated: 1.0 ≈ 2.0")
+
+str = sprint(show, fails[5])
+@test contains(str, "Expression: 1 + 0 == 2 + 0 == 3 + 0")
+@test contains(str, "Evaluated: 1 == 2 == 3")
+
+str = sprint(show, fails[6])
+@test contains(str, "Expression: 1 - 2 == 2 - 1")
+@test contains(str, "Evaluated: -1 == 1")
+
+str = sprint(show, fails[7])
+@test contains(str, "Unexpected Pass")
+@test contains(str, "Expression: true")
 
 # Test printing of a TestSetException
-tse_str = sprint(show, Test.TestSetException(1,2,3,4))
+tse_str = sprint(show, Test.TestSetException(1,2,3,4,Vector{Union{Base.Test.Error, Base.Test.Fail}}()))
 @test contains(tse_str, "1 passed")
 @test contains(tse_str, "2 failed")
 @test contains(tse_str, "3 errored")
@@ -75,11 +117,15 @@ tse_str = sprint(show, Test.TestSetException(1,2,3,4))
 @test Test.finish(Test.FallbackTestSet()) !== nothing
 
 OLD_STDOUT = STDOUT
+OLD_STDERR = STDERR
 catch_out = IOStream("")
-rd, wr = redirect_stdout()
+catch_err = IOStream("")
+rde, wre = redirect_stderr()
+rdo, wro = redirect_stdout()
 
-# Check that the fallback test set throws immediately
-@test_throws ErrorException (@test 1 == 2)
+# test that FallbackTestSet will throw immediately
+cmd = `$(Base.julia_cmd()) --startup-file=no --depwarn=error test_exec.jl`
+@test !success(pipeline(cmd))
 
 @testset "no errors" begin
     @test true
@@ -92,83 +138,103 @@ end
     end
 end
 
-try @testset "outer" begin
-    @testset "inner1" begin
+@testset "testset types" begin
+    ts = @testset "@testset should return the testset" begin
         @test true
-        @test false
-        @test 1 == 1
-        @test 2 == :foo
-        @test 3 == 3
-        @testset "d" begin
-            @test 4 == 4
-        end
-        @testset begin
-            @test :blank != :notblank
-        end
     end
-    @testset "inner1" begin
-        @test 1 == 1
-        @test 2 == 2
-        @test 3 == :bar
-        @test 4 == 4
-        @test_throws ErrorException 1+1
-        @test_throws ErrorException error()
-        @test_throws RemoteException error()
-        @testset "errrrr" begin
-            @test "not bool"
-            @test error()
-        end
-
-        error("exceptions in testsets should be caught")
-        @test 1 == 1 # this test will not be run
+    @test typeof(ts) == Base.Test.DefaultTestSet
+    @test ts.n_passed == 1
+    tss = @testset "@testset/for should return an array of testsets: $i" for i in 1:3
+        @test true
     end
-
-    @testset "loop with desc" begin
-        @testset "loop1 $T" for T in (Float32, Float64)
-            @test 1 == T(1)
-        end
-    end
-    @testset "loops without desc" begin
-        @testset for T in (Float32, Float64)
-            @test 1 == T(1)
-        end
-        @testset for T in (Float32, Float64), S in (Int32,Int64)
-            @test S(1) == T(1)
-        end
-    end
-    srand(123)
-    @testset "some loops fail" begin
-        @testset for i in 1:5
-            @test i <= rand(1:10)
-        end
-        # should add 3 errors and 3 passing tests
-        @testset for i in 1:6
-            iseven(i) || error("error outside of test")
-            @test true # only gets run if the above passed
-        end
-    end
+    @test length(tss) == 3
+    @test typeof(tss[1]) == Base.Test.DefaultTestSet
+    @test tss[1].n_passed == 1
 end
-# These lines shouldn't be called
-redirect_stdout(OLD_STDOUT)
-error("No exception was thrown!")
-catch ex
-    @test isa(ex, Test.TestSetException)
-    @test ex.pass   == 24
-    @test ex.fail   == 6
-    @test ex.error  == 6
-    @test ex.broken == 0
+@testset "accounting" begin
+    local ts
+    try
+        ts = @testset "outer" begin
+            @testset "inner1" begin
+                @test true
+                @test false
+                @test 1 == 1
+                @test 2 == :foo
+                @test 3 == 3
+                @testset "d" begin
+                    @test 4 == 4
+                end
+                @testset begin
+                    @test :blank != :notblank
+                end
+            end
+            @testset "inner1" begin
+                @test 1 == 1
+                @test 2 == 2
+                @test 3 == :bar
+                @test 4 == 4
+                @test_throws ErrorException 1+1
+                @test_throws ErrorException error()
+                @test_throws RemoteException error()
+                @testset "errrrr" begin
+                    @test "not bool"
+                    @test error()
+                end
+
+                error("exceptions in testsets should be caught")
+                @test 1 == 1 # this test will not be run
+            end
+
+            @testset "loop with desc" begin
+                @testset "loop1 $T" for T in (Float32, Float64)
+                    @test 1 == T(1)
+                end
+            end
+            @testset "loops without desc" begin
+                @testset for T in (Float32, Float64)
+                    @test 1 == T(1)
+                end
+                @testset for T in (Float32, Float64), S in (Int32,Int64)
+                    @test S(1) == T(1)
+                end
+            end
+            srand(123)
+            @testset "some loops fail" begin
+                @testset for i in 1:5
+                    @test i <= rand(1:10)
+                end
+                # should add 3 errors and 3 passing tests
+                @testset for i in 1:6
+                    iseven(i) || error("error outside of test")
+                    @test true # only gets run if the above passed
+                end
+            end
+        end
+        # These lines shouldn't be called
+        error("No exception was thrown!")
+    catch ex
+        redirect_stdout(OLD_STDOUT)
+        redirect_stderr(OLD_STDERR)
+        ex
+    end
+    @testset "ts results" begin
+        @test isa(ts, Test.DefaultTestSet)
+        passes, fails, errors, broken, c_passes, c_fails, c_errors, c_broken = Base.Test.get_test_counts(ts)
+        total_pass   = passes + c_passes
+        total_fail   = fails  + c_fails
+        total_error  = errors + c_errors
+        total_broken = broken + c_broken
+        @test total_pass   == 24
+        @test total_fail   == 6
+        @test total_error  == 6
+        @test total_broken == 0
+    end
+    ts.anynonpass = false
+    deleteat!(Base.Test.get_testset().results,1)
 end
 
-# Test @test_approx_eq
-# TODO
-@test isapprox(.1+.1+.1, .3)
-@test !isapprox(.1+.1+.1, .4)
-
-@test_throws ErrorException Test.test_approx_eq(ones(10),ones(11),1e-8,"a","b")
-@test_throws ErrorException Test.test_approx_eq(ones(10),zeros(10),1e-8,"a","b")
-
-# Test @test_approx_eq_eps
-# TODO
+@test .1+.1+.1 ≈ .3
+@test .1+.1+.1 ≉ .4
 
 ts = @testset "@testset should return the testset" begin
     @test true
@@ -237,16 +303,17 @@ ts = try
 catch
     nothing # Shouldn't get here
 end
-@test typeof(ts) == Base.Test.DefaultTestSet
+@test ts isa Base.Test.DefaultTestSet
 
 # now we're done running tests with DefaultTestSet so we can go back to STDOUT
 redirect_stdout(OLD_STDOUT)
+redirect_stderr(OLD_STDERR)
 
 # import the methods needed for defining our own testset type
 import Base.Test: record, finish
 using Base.Test: get_testset_depth, get_testset
 using Base.Test: AbstractTestSet, Result, Pass, Fail, Error
-immutable CustomTestSet <: Base.Test.AbstractTestSet
+struct CustomTestSet <: Base.Test.AbstractTestSet
     description::AbstractString
     foo::Int
     results::Vector
@@ -355,7 +422,7 @@ end
 
 # Test that @inferred works with A[i] expressions
 @test @inferred((1:3)[2]) == 2
-immutable SillyArray <: AbstractArray{Float64,1} end
+struct SillyArray <: AbstractArray{Float64,1} end
 Base.getindex(a::SillyArray, i) = rand() > 0.5 ? 0 : false
 test_result = @test_throws ErrorException @inferred(SillyArray()[2])
 @test contains(test_result.value.msg, "Bool")
@@ -376,3 +443,71 @@ end
 @test @inferred(inferrable_kwtest(1; y=1)) == 2
 @test @inferred(uninferrable_kwtest(1)) == 3
 @test_throws ErrorException @inferred(uninferrable_kwtest(1; y=2)) == 2
+
+@test_throws ErrorException @testset "$(error())" for i in 1:10
+end
+@test_throws ErrorException @testset "$(error())" begin
+end
+
+io = IOBuffer()
+@test (print(io, Base.Test.Error(:test_error, "woot", 5, backtrace())); 1) == 1
+str = String(take!(io))
+# NOTE: This test depends on the code generated by @testset getting compiled,
+# to get good backtraces. If it fails, check the implementation of `testset_beginend`.
+@test contains(str, "test.jl")
+@test !contains(str, "boot.jl")
+
+let io = IOBuffer()
+    exc = Test.TestSetException(1,2,3,4,Vector{Union{Base.Test.Error, Base.Test.Fail}}())
+    Base.showerror(io, exc, backtrace())
+    @test !contains(String(take!(io)), "backtrace()")
+end
+
+# 19750
+let io = IOBuffer()
+    exc = Test.TestSetException(1,2,3,4,Vector{Union{Base.Test.Error, Base.Test.Fail}}())
+    Base.showerror(io, exc, backtrace())
+    @test !contains(String(take!(io)), "backtrace()")
+
+    exc = Test.FallbackTestSetException("msg")
+    Base.showerror(io, exc, backtrace())
+    str = String(take!(io))
+    @test contains(str, "msg")
+    @test !contains(str, "backtrace()")
+end
+
+msg = readstring(pipeline(ignorestatus(`$(Base.julia_cmd()) --startup-file=no --color=no -e '
+using Base.Test
+
+foo(x) = length(x)^2
+
+@testset "Foo Tests" begin
+    @testset "Animals" begin
+        @testset "Felines" begin
+            @test foo("cat") == 9
+        end
+        @testset "Canines" begin
+            @test foo("dog") == 11
+        end
+    end
+    @testset "Arrays" begin
+        @test foo(zeros(2)) == 4
+        @test foo(ones(4)) == 15
+    end
+end'`), stderr=DevNull))
+
+@test contains(msg,
+"""
+Test Summary: | Pass  Fail  Total
+Foo Tests     |    2     2      4
+  Animals     |    1     1      2
+    Felines   |    1            1
+    Canines   |          1      1
+  Arrays      |    1     1      2
+""")
+
+# 20489
+msg = split(readstring(pipeline(ignorestatus(`$(Base.julia_cmd()) --startup-file=no --color=no -e '
+Test.print_test_results(Test.DefaultTestSet(""))'`), stderr=DevNull)), "\n")[1]
+
+@test msg == rstrip(msg)

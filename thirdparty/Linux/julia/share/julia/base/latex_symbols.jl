@@ -83,6 +83,11 @@ const latex_symbols = Dict(
     "\\pppprime" => "⁗",
     "\\backpprime" => "‶",
     "\\backppprime" => "‷",
+    "\\xor" => "⊻",
+    "\\iff" => "⟺",
+    "\\implies" => "⟹",
+    "\\impliedby" => "⟸",
+    "\\to" => "→",
 
     # Superscripts
     "\\^0" => "⁰",
@@ -256,7 +261,7 @@ const latex_symbols = Dict(
     "\\Elzopeno" => "ɔ",
     "\\Elzrtld" => "ɖ",
     "\\Elzschwa" => "ə",
-    "\\varepsilon" => "ɛ",
+    "\\varepsilon" => "ε",
     "\\Elzpgamma" => "ɣ",
     "\\Elzpbgam" => "ɤ",
     "\\Elztrnh" => "ɥ",

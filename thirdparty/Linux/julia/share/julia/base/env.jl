@@ -58,7 +58,12 @@ end # os test
 
 ## ENV: hash interface ##
 
-type EnvHash <: Associative{String,String}; end
+"""
+    EnvHash() -> EnvHash
+
+A singleton of this type provides a hash table interface to environment variables.
+"""
+mutable struct EnvHash <: Associative{String,String}; end
 
 """
     ENV
@@ -76,7 +81,6 @@ in(k::AbstractString, ::KeyIterator{EnvHash}) = _hasenv(k)
 pop!(::EnvHash, k::AbstractString) = (v = ENV[k]; _unsetenv(k); v)
 pop!(::EnvHash, k::AbstractString, def) = haskey(ENV,k) ? pop!(ENV,k) : def
 delete!(::EnvHash, k::AbstractString) = (_unsetenv(k); ENV)
-delete!(::EnvHash, k::AbstractString, def) = haskey(ENV,k) ? delete!(ENV,k) : def
 setindex!(::EnvHash, v, k::AbstractString) = _setenv(k,string(v))
 push!(::EnvHash, k::AbstractString, v) = setindex!(ENV, v, k)
 
@@ -93,7 +97,7 @@ if is_windows()
         pos = block[1]
         blk = block[2]
         len = ccall(:wcslen, UInt, (Ptr{UInt16},), pos)
-        buf = Array{UInt16}(len)
+        buf = Vector{UInt16}(len)
         unsafe_copy!(pointer(buf), pos, len)
         env = transcode(String, buf)
         m = match(r"^(=?[^=]+)=(.*)$"s, env)

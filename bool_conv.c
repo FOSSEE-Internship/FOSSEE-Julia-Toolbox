@@ -149,22 +149,32 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
             typedef struct {
                 jl_array_t *chunks;
                 int64_t len;
-                jl_value_t *dims; 
+                jl_value_t *dims;
             } jl_bit_array_t;
 
             jl_bit_array_t *ret = (jl_bit_array_t*) input;
 
             int64_t len = ret->len;
-            sciprint("%s: BitArray \n", "bool_jl_to_sci");
+            sciprint("%s: BitArray, len: %d \n", "bool_jl_to_sci", len);
             uint64_t *zData = (uint64_t*) jl_array_data(ret->chunks);
-            jl_value_t *dimensions = ret->dims;
+            for (int i = 0; i != len; i++) 
+                sciprint("%d, ", zData[i/64] & 1 << (i%64));
+            sciprint("\n");
 
-            
-            ndims = jl_nfields(dimensions);
+            // jl_value_t *dimensions = ret->dims;
+
+            // sciprint("dims: %s type \n",jl_typeof_str(ret->dims));
+            // ndims = jl_nfields(dimensions);
+            ndims = 2;
 
             dims = (int*) malloc(ndims * sizeof(int));
-            for (int i = 0; i != ndims; i++)
-                dims[i] = jl_unbox_int64(jl_get_field(dimensions, i));
+            for (int i = 0; i != ndims; i++){
+                if (i == 0)
+                    dims[i] = len;
+                else 
+                    dims[i] = 1;
+                // dims[i] = jl_unbox_int64(jl_get_field(dimensions, i));
+            }
 
             data = (int*) malloc(len * sizeof(int));
             for (int i = 0; i != len; i++) {

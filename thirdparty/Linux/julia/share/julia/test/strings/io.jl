@@ -144,7 +144,7 @@ end
 @test join(["apples", "bananas", "pineapples"], ", ", " and ") == "apples, bananas and pineapples"
 
 # issue #9178 `join` calls `done()` twice on the iterables
-type i9178
+mutable struct i9178
     nnext::Int64
     ndone::Int64
 end
@@ -161,7 +161,7 @@ arr = ["a","b","c"]
 # join with empty input
 myio = IOBuffer()
 join(myio, "", "", 1)
-@test isempty(takebuf_array(myio))
+@test isempty(take!(myio))
 
 # unescape_chars
 @test Base.unescape_chars("\\t","t") == "t"
@@ -183,3 +183,94 @@ join(myio, "", "", 1)
 @test Base.unindent("\n    \tfoo",4) == "\n    foo"
 @test Base.unindent("\n\t\n    \tfoo",4) == "\n    \n    foo"
 @test Base.unindent("\n\tfoo\tbar",4) == "\n    foo     bar"
+
+# Tests of raw_str macro
+@test raw"$" == "\$"
+@test raw"\n" == "\\n"
+@test raw"\t" == "\\t"
+
+s1 = raw"""
+     lorem ipsum\n
+     $x = 1$
+     """
+
+s2 = """
+     lorem ipsum\\n
+     \$x = 1\$
+     """
+
+@test s1 == s2
+
+# issue #22021, string realloc bug with join
+s22021 = String["\"\"\"
+     non_max_suppression(boxes, scores, max_output_size; iou_threshold=nothing)
+
+Greedily selects a subset of bounding boxes in descending order of score,
+
+pruning away boxes that have high intersection-over-union (IOU) overlap
+with previously selected boxes.  Bounding boxes are supplied as
+[y1, x1, y2, x2], where (y1, x1) and (y2, x2) are the coordinates of any
+diagonal pair of box corners and the coordinates can be provided as normalized
+(i.e., lying in the interval [0, 1]) or absolute.  Note that this algorithm
+is agnostic to where the origin is in the coordinate system.  Note that this
+algorithm is invariant to orthogonal transformations and translations
+of the coordinate system; thus translating or reflections of the coordinate
+system result in the same boxes being selected by the algorithm.
+
+The output of this operation is a set of integers indexing into the input
+collection of bounding boxes representing the selected boxes.  The bounding
+box coordinates corresponding to the selected indices can then be obtained
+using the `tf.gather operation`.  For example:
+
+  selected_indices = tf.image.non_max_suppression(
+      boxes, scores, max_output_size, iou_threshold)
+  selected_boxes = tf.gather(boxes, selected_indices)
+\"\"\"",
+    "    tf.@op function non_max_suppression(v13566, v13567, v13568; name=nothing, iou_threshold=nothing) ",
+    "            local desc ",
+    "            tf.with_op_name((()->begin  ",
+    "                        desc = tf.NodeDescription(\"NonMaxSuppression\") ",
+    "                        begin  ",
+    "                            begin  ",
+    "                                v13566 = convert(TensorFlow.Tensor{Float32}, v13566) ",
+    "                                begin  ",
+    "                                end",
+    "                            end",
+    "                            begin  ",
+    "                                v13567 = convert(TensorFlow.Tensor{Float32}, v13567) ",
+    "                                begin  ",
+    "                                end",
+    "                            end",
+    "                            begin  ",
+    "                                v13568 = convert(TensorFlow.Tensor{Int32}, v13568) ",
+    "                                begin  ",
+    "                                end",
+    "                            end",
+    "                        end ",
+    "                        begin  ",
+    "                            begin  ",
+    "                                tf.add_input(desc, v13566)",
+    "                            end",
+    "                            begin  ",
+    "                                tf.add_input(desc, v13567)",
+    "                            end",
+    "                            begin  ",
+    "                                tf.add_input(desc, v13568)",
+    "                            end",
+    "                        end ",
+    "                        begin  ",
+    "                            begin  ",
+    "                                if iou_threshold !== nothing ",
+    "                                    desc[\"iou_threshold\"] = Base.identity(iou_threshold)",
+    "                                end",
+    "                            end",
+    "                        end",
+    "                    end), name, \"NonMaxSuppression\") ",
+    "            tf.Tensor(tf.Operation(desc))",
+    "        end"]
+
+for i = 1:10
+    buf = IOBuffer()
+    print(buf, join(s22021, "\n"))
+    @test isvalid(String, take!(buf))
+end
