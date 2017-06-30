@@ -36,6 +36,55 @@ int sci_exit_julia(char* fname, unsigned long fname_len) {
     return 0;
 }
 
+int sci_import_package(char* fname, unsigned long fname_len) {
+    // Error management variable
+    SciErr sciErr;
+
+    ////////// Variables declaration //////////
+    int *addrEvalString = NULL;
+    char *package, *function;
+
+    int nInputArgs = nbInputArgument(pvApiCtx);
+    int nOutputArgs = nbOutputArgument(pvApiCtx);
+
+    ////////// Manage the first input argument (double) //////////
+    /* get Address of inputs */
+    sciErr = getVarAddressFromPosition(pvApiCtx, 1, &addrEvalString);
+    if (sciErr.iErr)
+    {
+        printError(&sciErr, 0);
+        return 0;
+    }
+
+    if(!isStringType(pvApiCtx, addrEvalString)) {
+        Scierror(999, "%s: argument #%d not a string: string expected\n", fname, 1);
+        return 0;
+    }
+
+    int err = getAllocatedSingleString(pvApiCtx, addrEvalString, &package);
+    if (err != 0)
+    {
+        return 0;
+    }
+
+    sciprint("%s: adding %s\n", fname, package);
+    char add[100]; 
+    sprintf(add, "Pkg.add(%s)", package);
+    jl_eval_string(add);
+
+    int i = 0;
+    char *importing = (char*) (malloc(sizeof(char) * (strlen(package) + strlen("using ") + 2))); 
+    strcpy(importing, "using ");
+    strcat(importing, package);
+
+
+    sciprint("%s: importing \"%s\" \n", fname, importing);
+    jl_value_t *temp = jl_eval_string(importing);
+
+    sciprint("%s: %s\n", fname, jl_typeof_str(temp));
+    return 0;
+}
+
 int sci_eval_julia(char *fname, unsigned long fname_len) {
     // Error management variable
     SciErr sciErr;
@@ -282,7 +331,7 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     int i = 0;
 
     // get function using the function name provided
-    jl_function_t *func = jl_get_function(jl_base_module, functionName);
+    jl_function_t *func = jl_get_function(jl_main_module, functionName);
     if (jl_exception_occurred()) {
         printf("%s \n", jl_typeof_str(jl_exception_occurred()));
         return 0;

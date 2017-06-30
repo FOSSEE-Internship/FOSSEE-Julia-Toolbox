@@ -10,11 +10,13 @@ extern Gatefunc sci_call_julia;
 extern Gatefunc sci_init_julia;
 extern Gatefunc sci_eval_julia;
 extern Gatefunc sci_exit_julia;
+extern Gatefunc sci_import_package;
 static GenericTable Tab[]={
   {(Myinterfun)sci_gateway,sci_call_julia,"callJulia"},
   {(Myinterfun)sci_gateway,sci_init_julia,"initJulia"},
   {(Myinterfun)sci_gateway,sci_eval_julia,"evalJulia"},
   {(Myinterfun)sci_gateway,sci_exit_julia,"exitJulia"},
+  {(Myinterfun)sci_gateway,sci_import_package,"importJuliaPackage"},
 };
  
 int C2F(libbuild_lib)()

@@ -15,6 +15,7 @@ list_functions = [ 'callJulia';
                    'initJulia';
                    'evalJulia';
                    'exitJulia';
+                   'importJuliaPackage';
 ];
 addinter(libbuild_lib_path + filesep() + 'libbuild_lib' + getdynlibext(), 'libbuild_lib', list_functions);
 // remove temp. variables on stack
