@@ -64,10 +64,10 @@ int main() {
     typedef struct {
         jl_array_t *chunks;
         int64_t len;
-        jl_value_t *dims;
+        int64_t *dims;
     } jl_bit_array_t;
 
-    jl_bit_array_t *ret = (jl_bit_array_t*) jl_eval_string(".!([true false; true true; false false])");
+    jl_bit_array_t *ret = (jl_bit_array_t*) jl_eval_string(".!([true true false; true true true; true false false])");
 
     int64_t len = ret->len;
     printf("%s: BitArray, len: %d \n", "bool_jl_to_sci", len);
@@ -76,9 +76,9 @@ int main() {
         printf("%d, ", (zData[i/64] & 1 << (i%64)) > 0);
     printf("\n");
 
-    jl_value_t *dimensions = ret->dims;
+    int64_t *dimensions = &(ret->dims);
 
-    printf("dims: %s type \n",jl_typeof_str(ret->dims));
+    printf("%d \n", dimensions[2]);
 
 
     /* strongly recommended: notify Julia that the
