@@ -86,8 +86,12 @@ int sci_import_package(char* fname, unsigned long fname_len) {
 }
 
 int jl_to_sci(jl_value_t *ret, int position) {
-    int err;
+    if (jl_isa(ret, jl_get_global(jl_base_module, jl_symbol("Void")))) {
+        return 1;
+    }
 
+    int err;
+    
     size_t al;
     int tuple = 0, i;
     char *fname = "jl_to_sci";
@@ -390,7 +394,6 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
     }
 
     sciprint("%s: convert julia variables back to scilab\n", fname);
-    
     err = jl_to_sci(ret, 0);
     if (err == 0) {
         JL_GC_POP();
