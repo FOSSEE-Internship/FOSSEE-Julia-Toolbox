@@ -7,13 +7,13 @@ function builder_gw_cpp()
 	root = get_absolute_file_path('builder.sce')
 	third_party_dir = root + 'thirdparty'
 	
-	julia_dir = third_party_dir + '/' + getos() + '/julia'
-	julialibpath = julia_dir + '/lib/'
+	julia_dir = third_party_dir + filesep() + getos() + filesep() + 'julia'
+	julialibpath = julia_dir + filesep() + 'lib'
 
 	// Loading dependencies 
 	if getos() == 'Windows' then 
-		disp("Not yet implemented for Windows")
-		return;
+		include = "-DJULIA_ENABLE_THREADING=1 -DJULIA_INIT_DIR=""" + julialibpath + """ -I""C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\um"" -I""C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\shared"" -I""" + julia_dir + "\include\julia"" "
+		ldflag = "-L""" + julia_dir + "\bin"" -ljulia -lopenlibm "
 	elseif getos() == 'Darwin' then
 		include = "-g -DJULIA_ENABLE_THREADING=1 -fPIC -DJULIA_INIT_DIR=" + julia_dir + "/lib -I" + julia_dir + "/include/julia"
 		ldflag = "-L" + julialibpath + " -Wl,-rpath," + julialibpath + " -ljulia"
@@ -25,7 +25,7 @@ function builder_gw_cpp()
 
 
 	setenv('JULIA_DIR', julia_dir)
-	setenv('JULIA_HOME', julia_dir + '/bin')
+	setenv('JULIA_HOME', julia_dir + filesep() + 'bin')
 
 	ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'evalJulia', 'sci_eval_julia'; 'exitJulia', 'sci_exit_julia'], files, [julialibpath + 'libjulia'], [], ldflag, include);
 	// ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], files, [], [], ldflag, include);
