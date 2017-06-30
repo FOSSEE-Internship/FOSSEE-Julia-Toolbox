@@ -17,7 +17,7 @@ function builder_gw_cpp()
 	elseif getos() == 'Darwin' then
 		include = "-g -DJULIA_ENABLE_THREADING=1 -fPIC -DJULIA_INIT_DIR=" + julia_dir + "/lib -I" + julia_dir + "/include/julia"
 		ldflag = "-L" + julialibpath + " -Wl,-rpath," + julialibpath + " -ljulia"
-		link(julialibpath + 'julia/libcurl.5' + getdynlibext())
+		link(julialibpath + '/julia/libcurl.5' + getdynlibext())
 	elseif getos() == 'Linux' then
 		include = '-g -I/home/harshith/scilab-5.5.2/include -I' + julia_dir + '/include/julia -DJULIA_ENABLE_THREADING'
 		ldflag = '-L' + julia_dir + '/lib/julia -L' + julialibpath + ' -Wl,--verbose -Wl,-rpath,' + julialibpath + ' -Wl,-Bstatic -ljulia' 

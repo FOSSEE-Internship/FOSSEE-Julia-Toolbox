@@ -10,7 +10,7 @@ if bOK then
   ulink(ilib);
 end
 //
-link('/home/harshith/scijulia/thirdparty/Linux/julia/lib/libjulia' + getdynlibext());
+link('/Users/harshithgoka/Documents/GitHub/scilab-julia-interface/thirdparty/Darwin/julia/lib/libjulia' + getdynlibext());
 list_functions = [ 'callJulia';
                    'initJulia';
                    'evalJulia';
