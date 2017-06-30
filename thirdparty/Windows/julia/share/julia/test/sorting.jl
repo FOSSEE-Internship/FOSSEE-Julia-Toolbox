@@ -95,7 +95,7 @@ end
 @test searchsortedlast(500:1.0:600, 1.0e20) == 101
 
 # exercise the codepath in searchsorted* methods for ranges that check for zero step range
-immutable ConstantRange{T} <: Range{T}
+struct ConstantRange{T} <: Range{T}
    val::T
    len::Int
 end
@@ -275,7 +275,7 @@ for n in [0:10; 100; 101; 1000; 1001]
         # test float sorting with NaNs
         s = sort(v, alg=alg, rev=rev)
         @test issorted(s, rev=rev)
-        @test reinterpret(UInt64,v[isnan(v)]) == reinterpret(UInt64,s[isnan(s)])
+        @test reinterpret(UInt64,v[isnan.(v)]) == reinterpret(UInt64,s[isnan.(s)])
 
         # test float permutation with NaNs
         p = sortperm(v, alg=alg, rev=rev)
@@ -337,7 +337,7 @@ end
 @test sortperm([-1.0, 1.0, 1.0], rev=true) == [2, 3, 1]
 
 # issue #8825 - stability of min/max
-type Twain
+mutable struct Twain
     a :: Int
     b :: Int
 end
@@ -348,3 +348,14 @@ end
 
 # issue #12833 - type stability of sort
 @test Base.return_types(sort, (Vector{Int},)) == [Vector{Int}]
+
+# PR #18791
+@test sort([typemax(Int),typemin(Int)]) == [typemin(Int),typemax(Int)]
+@test sort([typemax(UInt),0]) == [0,typemax(UInt)]
+
+# issue #19005
+@test searchsortedfirst(0:256, 0x80) == 129
+@test searchsortedlast(0:256, 0x80) == 129
+
+# https://discourse.julialang.org/t/sorting-big-int-with-v-0-6/1241
+@test sort([big(3), big(2)]) == [big(2), big(3)]

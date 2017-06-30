@@ -17,7 +17,7 @@ end
 """
     @threadcall((cfunc, clib), rettype, (argtypes...), argvals...)
 
-The `@threadcall` macro is called in the same way as `ccall` but does the work
+The `@threadcall` macro is called in the same way as [`ccall`](@ref) but does the work
 in a different thread. This is useful when you want to call a blocking C
 function without causing the main `julia` thread to become blocked. Concurrency
 is limited by size of the libuv thread pool, which defaults to 4 threads but
@@ -69,7 +69,7 @@ function do_threadcall(wrapper::Function, rettype::Type, argtypes::Vector, argva
     # cconvert, root and unsafe_convert arguments
     roots = Any[]
     args_size = isempty(argtypes) ? 0 : sum(sizeof, argtypes)
-    args_arr = Array{UInt8}(args_size)
+    args_arr = Vector{UInt8}(args_size)
     ptr = pointer(args_arr)
     for (T, x) in zip(argtypes, argvals)
         y = cconvert(T, x)
@@ -79,7 +79,7 @@ function do_threadcall(wrapper::Function, rettype::Type, argtypes::Vector, argva
     end
 
     # create return buffer
-    ret_arr = Array{UInt8}(sizeof(rettype))
+    ret_arr = Vector{UInt8}(sizeof(rettype))
 
     # wait for a worker thread to be available
     acquire(threadcall_restrictor)

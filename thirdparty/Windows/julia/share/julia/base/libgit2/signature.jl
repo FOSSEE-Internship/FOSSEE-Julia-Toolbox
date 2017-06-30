@@ -16,14 +16,14 @@ function Signature(name::AbstractString, email::AbstractString)
                  (Ptr{Ptr{SignatureStruct}}, Cstring, Cstring), sig_ptr_ptr, name, email)
     sig = GitSignature(sig_ptr_ptr[])
     s = Signature(sig.ptr)
-    finalize(sig)
+    close(sig)
     return s
 end
 
 function Signature(repo::GitRepo)
     sig = default_signature(repo)
     s = Signature(sig.ptr)
-    finalize(sig)
+    close(sig)
     return s
 end
 
@@ -33,6 +33,13 @@ function Base.convert(::Type{GitSignature}, sig::Signature)
                  (Ptr{Ptr{SignatureStruct}}, Cstring, Cstring, Int64, Cint),
                  sig_ptr_ptr, sig.name, sig.email, sig.time, sig.time_offset)
     return GitSignature(sig_ptr_ptr[])
+end
+
+function Base.show(io::IO, sig::Signature)
+    print(io, "Name: ", sig.name, ", ")
+    print(io, "Email: ", sig.email, ", ")
+    print(io, "Time: ", Dates.unix2datetime(sig.time + 60*sig.time_offset))
+    @printf(io, "%+03i:%02i", divrem(sig.time_offset, 60)...)
 end
 
 """Return signature object. Free it after use."""

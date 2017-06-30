@@ -1,18 +1,18 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-type Table
+mutable struct Table
     rows::Vector{Vector{Any}}
     align::Vector{Symbol}
 end
 
 function parserow(stream::IO)
     withstream(stream) do
-        line = readline(stream) |> chomp
+        line = readline(stream)
         row = split(line, r"(?<!\\)\|")
         length(row) == 1 && return
-        row[1] == "" && shift!(row)
-        map!(x -> strip(replace(x, "\\|", "|")), row)
-        row[end] == "" && pop!(row)
+        isempty(row[1]) && shift!(row)
+        map!(x -> strip(replace(x, "\\|", "|")), row, row)
+        isempty(row[end]) && pop!(row)
         return row
     end
 end
@@ -45,7 +45,7 @@ function github_table(stream::IO, md::MD)
         align = nothing
         while (row = parserow(stream)) !== nothing
             if length(rows) == 0
-                row[1] == "" && return false
+                isempty(row[1]) && return false
                 cols = length(row)
             end
             if align === nothing && length(rows) == 1 # Must have a --- row
@@ -78,7 +78,7 @@ end
 mapmap(f, xss) = map(xs->map(f, xs), xss)
 
 colwidths(rows; len = length, min = 0) =
-    reduce(max, [min; convert(Vector{Vector{Int}}, mapmap(len, rows))])
+    reduce((x,y) -> max.(x,y), [min; convert(Vector{Vector{Int}}, mapmap(len, rows))])
 
 padding(width, twidth, a) =
     a == :l ? (0, twidth - width) :

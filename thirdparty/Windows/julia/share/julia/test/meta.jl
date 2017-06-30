@@ -2,9 +2,7 @@
 
 # test meta-expressions that annotate blocks of code
 
-module MetaTest
-
-using Base.Test
+const inlining_on = Base.JLOptions().can_inline != 0
 
 function f(x)
     y = x+5
@@ -42,7 +40,9 @@ function foundfunc(bt, funcname)
     end
     false
 end
-@test !foundfunc(h_inlined(), :g_inlined)
+if inlining_on
+    @test !foundfunc(h_inlined(), :g_inlined)
+end
 @test foundfunc(h_noinlined(), :g_noinlined)
 
 using Base.pushmeta!, Base.popmeta!
@@ -62,7 +62,7 @@ asts = code_lowered(dummy, Tuple{})
 ast = asts[1]
 
 body = Expr(:block)
-body.args = Base.uncompressed_ast(ast)
+body.args = ast.code
 
 @test popmeta!(body, :test) == (true, [42])
 @test popmeta!(body, :nonexistent) == (false, [])
@@ -110,24 +110,19 @@ asts = code_lowered(dummy_multi, Tuple{})
 ast = asts[1]
 
 body = Expr(:block)
-body.args = Base.uncompressed_ast(ast)
+body.args = ast.code
 
 @test popmeta!(body, :test) == (true, [40])
 @test popmeta!(body, :test) == (true, [41])
 @test popmeta!(body, :test) == (true, [42])
 @test popmeta!(body, :nonexistent) == (false, [])
 
-end
-
-
 # tests to fully cover functions in base/meta.jl
-module MetaJLtest
-
-using Base.Test
 using Base.Meta
 
 @test isexpr(:(1+1),Set([:call]))
 @test isexpr(:(1+1),Vector([:call]))
+@test isexpr(:(1+1),(:call,))
 @test isexpr(1,:call)==false
 @test isexpr(:(1+1),:call,3)
 ioB = IOBuffer()
@@ -135,4 +130,17 @@ show_sexpr(ioB,:(1+1))
 
 show_sexpr(ioB,QuoteNode(1),1)
 
+@test Base.Distributed.extract_imports(:(begin; import Foo, Bar; let; using Baz; end; end)) ==
+      [:Foo, :Bar, :Baz]
+
+# test base/expr.jl
+baremodule B
+    eval = 0
+    x = 1
+    module M; x = 2; end
+    import Base
+    @Base.eval x = 3
+    @Base.eval M x = 4
 end
+@test B.x == 3
+@test B.M.x == 4

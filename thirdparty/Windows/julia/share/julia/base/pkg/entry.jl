@@ -51,7 +51,7 @@ function add(pkg::AbstractString, vers::VersionSet)
     @sync begin
         @async if !edit(Reqs.add,pkg,vers)
             ispath(pkg) || throw(PkgError("unknown package $pkg"))
-            info("Nothing to be done")
+            info("Package $pkg is already installed")
         end
         branch = Dir.getmetabranch()
         outdated = with(GitRepo, "METADATA") do repo
@@ -79,7 +79,7 @@ add(pkg::AbstractString, vers::VersionNumber...) = add(pkg,VersionSet(vers...))
 
 function rm(pkg::AbstractString)
     edit(Reqs.rm,pkg) && return
-    ispath(pkg) || return info("Nothing to be done")
+    ispath(pkg) || return info("Package $pkg is not installed")
     info("Removing $pkg (unregistered)")
     Write.remove(pkg)
 end
@@ -125,7 +125,7 @@ function installed(pkg::AbstractString)
 end
 
 function status(io::IO; pkgname::AbstractString = "")
-    showpkg(pkg) = (pkgname == "") ? (true) : (pkg == pkgname)
+    showpkg(pkg) = isempty(pkgname) ? true : (pkg == pkgname)
     reqs = Reqs.parse("REQUIRE")
     instd = Read.installed()
     required = sort!(collect(keys(reqs)))
@@ -166,7 +166,7 @@ function status(io::IO, pkg::AbstractString, ver::VersionNumber, fix::Bool)
                 if LibGit2.isattached(prepo)
                     print(io, LibGit2.shortname(phead))
                 else
-                    print(io, string(LibGit2.Oid(phead))[1:8])
+                    print(io, string(LibGit2.GitHash(phead))[1:8])
                 end
             end
             attrs = AbstractString[]
@@ -174,12 +174,12 @@ function status(io::IO, pkg::AbstractString, ver::VersionNumber, fix::Bool)
             LibGit2.isdirty(prepo) && push!(attrs,"dirty")
             isempty(attrs) || print(io, " (",join(attrs,", "),")")
         catch err
-            print_with_color(:red, io, " broken-repo (unregistered)")
+            print_with_color(Base.error_color(), io, " broken-repo (unregistered)")
         finally
-            finalize(prepo)
+            close(prepo)
         end
     else
-        print_with_color(:yellow, io, "non-repo (unregistered)")
+        print_with_color(Base.warn_color(), io, "non-repo (unregistered)")
     end
     println(io)
 end
@@ -300,7 +300,7 @@ function pin(pkg::AbstractString, head::AbstractString)
         else
             LibGit2.revparseid(repo, head)
         end
-        commit = LibGit2.get(LibGit2.GitCommit, repo, id)
+        commit = LibGit2.GitCommit(repo, id)
         try
             # note: changing the following naming scheme requires a corresponding change in Read.ispinned()
             branch = "pinned.$(string(id)[1:8]).tmp"
@@ -311,27 +311,28 @@ function pin(pkg::AbstractString, head::AbstractString)
             end
             ref = LibGit2.lookup_branch(repo, branch)
             try
-                if ref !== nothing
+                if !isnull(ref)
                     if LibGit2.revparseid(repo, branch) != id
-                        throw(PkgError("Package $pkg: existing branch $branch has been edited and doesn't correspond to its original commit"))
+                        throw(PkgError("Package $pkg: existing branch $branch has " *
+                            "been edited and doesn't correspond to its original commit"))
                     end
                     info("Package $pkg: checking out existing branch $branch")
                 else
                     info("Creating $pkg branch $branch")
-                    ref = LibGit2.create_branch(repo, branch, commit)
+                    ref = Nullable(LibGit2.create_branch(repo, branch, commit))
                 end
 
                 # checkout selected branch
-                with(LibGit2.peel(LibGit2.GitTree, ref)) do btree
+                with(LibGit2.peel(LibGit2.GitTree, get(ref))) do btree
                     LibGit2.checkout_tree(repo, btree)
                 end
                 # switch head to the branch
-                LibGit2.head!(repo, ref)
+                LibGit2.head!(repo, get(ref))
             finally
-                finalize(ref)
+                close(get(ref))
             end
         finally
-            finalize(commit)
+            close(commit)
         end
     end
     should_resolve && resolve()
@@ -374,7 +375,8 @@ function update(branch::AbstractString, upkgs::Set{String})
             end
         catch err
             cex = CapturedException(err, catch_backtrace())
-            throw(PkgError("METADATA cannot be updated. Resolve problems manually in $(Pkg.dir("METADATA")).", cex))
+            throw(PkgError("METADATA cannot be updated. Resolve problems manually in " *
+                Pkg.dir("METADATA") * ".", cex))
         end
     end
     deferred_errors = CompositeException()
@@ -392,7 +394,9 @@ function update(branch::AbstractString, upkgs::Set{String})
     reqs = Reqs.parse("REQUIRE")
     if !isempty(upkgs)
         for (pkg, (v,f)) in instd
-            satisfies(pkg, v, reqs) || throw(PkgError("Package $pkg: current package status does not satisfy the requirements, cannot do a partial update; use `Pkg.update()`"))
+            satisfies(pkg, v, reqs) || throw(PkgError("Package $pkg: current " *
+                "package status does not satisfy the requirements, cannot do " *
+                "a partial update; use `Pkg.update()`"))
         end
     end
     dont_update = Query.partial_update_mask(instd, avail, upkgs)
@@ -479,11 +483,12 @@ function resolve(
     for pkg in keys(reqs)
         if !haskey(deps,pkg)
             if "julia" in conflicts[pkg]
-                throw(PkgError("$pkg can't be installed because it has no versions that support $VERSION of julia. " *
-                   "You may need to update METADATA by running `Pkg.update()`"))
+                throw(PkgError("$pkg can't be installed because it has no versions that support $VERSION " *
+                   "of julia. You may need to update METADATA by running `Pkg.update()`"))
             else
                 sconflicts = join(conflicts[pkg], ", ", " and ")
-                throw(PkgError("$pkg's requirements can't be satisfied because of the following fixed packages: $sconflicts"))
+                throw(PkgError("$pkg's requirements can't be satisfied because " *
+                    "of the following fixed packages: $sconflicts"))
             end
         end
     end
@@ -536,7 +541,7 @@ function resolve(
                 info("$(up)grading $pkg: v$ver1 => v$ver2")
                 Write.update(pkg, Read.sha1(pkg,ver2))
                 pkgsym = Symbol(pkg)
-                if isdefined(Main, pkgsym) && isa(getfield(Main, pkgsym), Module)
+                if Base.isbindingresolved(Main, pkgsym) && isa(getfield(Main, pkgsym), Module)
                     push!(imported, "- $pkg")
                 end
             end
@@ -574,60 +579,60 @@ function warnbanner(msg...; label="[ WARNING ]", prefix="")
     warn(prefix="", "="^cols)
 end
 
-function build!(pkgs::Vector, buildstream::IO, seen::Set)
-    for pkg in pkgs
-        pkg == "julia" && continue
-        pkg in seen ? continue : push!(seen,pkg)
-        Read.isinstalled(pkg) || throw(PkgError("$pkg is not an installed package"))
-        build!(Read.requires_list(pkg),buildstream,seen)
-        path = abspath(pkg,"deps","build.jl")
-        isfile(path) || continue
-        println(buildstream, path) # send to build process for evalfile
-        flush(buildstream)
-    end
-end
-
-function build!(pkgs::Vector, errs::Dict, seen::Set=Set())
-    # To isolate the build from the running Julia process, we
-    # execute the build.jl files in a separate process that
-    # is sitting there waiting for paths to evaluate.   Errors
-    # are serialized to errfile for later retrieval into errs[pkg]
-    errfile = tempname()
-    close(open(errfile, "w")) # create empty file
+function build(pkg::AbstractString, build_file::AbstractString, errfile::AbstractString)
+    # To isolate the build from the running Julia process, we execute each build.jl file in
+    # a separate process. Errors are serialized to errfile for later reporting.
+    # TODO: serialize the same way the load cache does, not with strings
+    LOAD_PATH = filter(x -> x isa AbstractString, Base.LOAD_PATH)
     code = """
         empty!(Base.LOAD_PATH)
-        append!(Base.LOAD_PATH, $(repr(Base.LOAD_PATH)))
+        append!(Base.LOAD_PATH, $(repr(LOAD_PATH)))
         empty!(Base.LOAD_CACHE_PATH)
         append!(Base.LOAD_CACHE_PATH, $(repr(Base.LOAD_CACHE_PATH)))
         empty!(Base.DL_LOAD_PATH)
         append!(Base.DL_LOAD_PATH, $(repr(Base.DL_LOAD_PATH)))
         open("$(escape_string(errfile))", "a") do f
-            for path_ in eachline(STDIN)
-                path = chomp(path_)
-                pkg = basename(dirname(dirname(path)))
-                try
-                    info("Building \$pkg")
-                    cd(dirname(path)) do
-                        evalfile(path)
-                    end
-                catch err
-                    Base.Pkg.Entry.warnbanner(err, label="[ ERROR: \$pkg ]")
-                    serialize(f, pkg)
-                    serialize(f, err)
+            pkg, build_file = "$pkg", "$(escape_string(build_file))"
+            try
+                info("Building \$pkg")
+                cd(dirname(build_file)) do
+                    evalfile(build_file)
                 end
+            catch err
+                Base.Pkg.Entry.warnbanner(err, label="[ ERROR: \$pkg ]")
+                serialize(f, pkg)
+                serialize(f, err)
             end
         end
     """
-    io, pobj = open(pipeline(detach(`$(Base.julia_cmd()) -O0
-                                    --compilecache=$(Bool(Base.JLOptions().use_compilecache) ? "yes" : "no")
-                                    --history-file=no
-                                    --color=$(Base.have_color ? "yes" : "no")
-                                    --eval $code`), stderr=STDERR), "w", STDOUT)
+    cmd = ```
+        $(Base.julia_cmd()) -O0
+        --compilecache=$(Bool(Base.JLOptions().use_compilecache) ? "yes" : "no")
+        --history-file=no
+        --color=$(Base.have_color ? "yes" : "no")
+        --eval $code
+    ```
+
+    success(pipeline(cmd, stderr=STDERR))
+end
+
+function build!(pkgs::Vector, seen::Set, errfile::AbstractString)
+    for pkg in pkgs
+        pkg == "julia" && continue
+        pkg in seen ? continue : push!(seen,pkg)
+        Read.isinstalled(pkg) || throw(PkgError("$pkg is not an installed package"))
+        build!(Read.requires_list(pkg), seen, errfile)
+        path = abspath(pkg,"deps","build.jl")
+        isfile(path) || continue
+        build(pkg, path, errfile) || error("Build process failed.")
+    end
+end
+
+function build!(pkgs::Vector, errs::Dict, seen::Set=Set())
+    errfile = tempname()
+    touch(errfile)  # create empty file
     try
-        build!(pkgs, io, seen)
-        close(io)
-        wait(pobj)
-        success(pobj) || error("Build process failed.")
+        build!(pkgs, seen, errfile)
         open(errfile, "r") do f
             while !eof(f)
                 pkg = deserialize(f)
@@ -635,10 +640,6 @@ function build!(pkgs::Vector, errs::Dict, seen::Set=Set())
                 errs[pkg] = err
             end
         end
-    catch err
-        close(io)
-        isa(err, PkgError) ? wait(pobj) : kill(pobj)
-        rethrow(err)
     finally
         isfile(errfile) && Base.rm(errfile)
     end
@@ -711,7 +712,7 @@ function test!(pkg::AbstractString,
         cd(dirname(test_path)) do
             try
                 color = Base.have_color? "--color=yes" : "--color=no"
-                codecov = coverage? ["--code-coverage=user", "--inline=no"] : ["--code-coverage=none"]
+                codecov = coverage? ["--code-coverage=user"] : ["--code-coverage=none"]
                 compilecache = "--compilecache=" * (Bool(Base.JLOptions().use_compilecache) ? "yes" : "no")
                 julia_exe = Base.julia_cmd()
                 run(`$julia_exe --check-bounds=yes $codecov $color $compilecache $test_path`)
@@ -723,6 +724,14 @@ function test!(pkg::AbstractString,
         end
     end
     isfile(reqs_path) && resolve()
+end
+
+mutable struct PkgTestError <: Exception
+    msg::String
+end
+
+function Base.showerror(io::IO, ex::PkgTestError, bt; backtrace=true)
+    print_with_color(Base.error_color(), io, ex.msg)
 end
 
 function test(pkgs::Vector{AbstractString}; coverage::Bool=false)
@@ -745,7 +754,7 @@ function test(pkgs::Vector{AbstractString}; coverage::Bool=false)
         if !isempty(notests)
             push!(messages, "$(join(notests,", "," and ")) did not provide a test/runtests.jl file")
         end
-        throw(PkgError(join(messages, "and")))
+        throw(PkgTestError(join(messages, "and")))
     end
 end
 

@@ -144,7 +144,7 @@ end
 
 @threads for i in 1:100
     for j in 1:100
-        eval(M14726, :(module_var14726 = $j))
+        @eval M14726 module_var14726 = $j
     end
 end
 @test isdefined(:orig_curmodule14726)
@@ -176,7 +176,7 @@ end
 @test_throws TypeError Atomic{Complex128}
 
 # Test atomic memory ordering with load/store
-type CommBuf
+mutable struct CommBuf
     var1::Atomic{Int}
     var2::Atomic{Int}
     correct_write::Bool
@@ -221,7 +221,7 @@ test_atomic()
 
 # Test ordering with fences using Peterson's algorithm
 # Example adapted from <https://en.wikipedia.org/wiki/Peterson%27s_algorithm>
-type Peterson
+mutable struct Peterson
     # State for Peterson's algorithm
     flag::Vector{Atomic{Int}}
     turn::Atomic{Int}
@@ -347,38 +347,56 @@ for T in (Int32, Int64, Float32, Float64)
     @test varmax[] === T(maximum(1:nloops))
     @test varmin[] === T(0)
 end
-
-let async = Base.AsyncCondition(), t
-    c = Condition()
-    task = schedule(Task(function()
+for period in (0.06, Dates.Millisecond(60))
+    let async = Base.AsyncCondition(), t
+        c = Condition()
+        task = schedule(Task(function()
+            notify(c)
+            wait(c)
+            t = Timer(period)
+            wait(t)
+            ccall(:uv_async_send, Void, (Ptr{Void},), async)
+            ccall(:uv_async_send, Void, (Ptr{Void},), async)
+            wait(c)
+            sleep(period)
+            ccall(:uv_async_send, Void, (Ptr{Void},), async)
+            ccall(:uv_async_send, Void, (Ptr{Void},), async)
+        end))
+        wait(c)
         notify(c)
-        wait(c)
-        t = Timer(0.06)
-        wait(t)
-        ccall(:uv_async_send, Void, (Ptr{Void},), async)
-        ccall(:uv_async_send, Void, (Ptr{Void},), async)
-        wait(c)
-        sleep(0.06)
-        ccall(:uv_async_send, Void, (Ptr{Void},), async)
-        ccall(:uv_async_send, Void, (Ptr{Void},), async)
-    end))
-    wait(c)
-    notify(c)
-    delay1 = @elapsed wait(async)
-    notify(c)
-    delay2 = @elapsed wait(async)
-    @test istaskdone(task)
-    @test delay1 > 0.05
-    @test delay2 > 0.05
-    @test isopen(async)
-    @test !isopen(t)
-    close(t)
-    close(async)
-    @test_throws EOFError wait(async)
-    @test !isopen(async)
-    @test_throws EOFError wait(t)
-    @test_throws EOFError wait(async)
+        delay1 = @elapsed wait(async)
+        notify(c)
+        delay2 = @elapsed wait(async)
+        @test istaskdone(task)
+        @test delay1 > 0.05
+        @test delay2 > 0.05
+        @test isopen(async)
+        @test !isopen(t)
+        close(t)
+        close(async)
+        @test_throws EOFError wait(async)
+        @test !isopen(async)
+        @test_throws EOFError wait(t)
+        @test_throws EOFError wait(async)
+    end
 end
+
+complex_cfunction = function(a)
+    s = zero(eltype(a))
+    @inbounds @simd for i in a
+        s += muladd(a[i], a[i], -2)
+    end
+    return s
+end
+function test_thread_cfunction()
+    @threads for i in 1:1000
+        # Make sure this is not inferrable
+        # and a runtime call to `jl_function_ptr` will be created
+        ccall(:jl_function_ptr, Ptr{Void}, (Any, Any, Any),
+              complex_cfunction, Float64, Tuple{Ref{Vector{Float64}}})
+    end
+end
+test_thread_cfunction()
 
 # Compare the two ways of checking if threading is enabled.
 # `jl_tls_states` should only be defined on non-threading build.
@@ -388,3 +406,46 @@ if ccall(:jl_threading_enabled, Cint, ()) == 0
 else
     @test_throws ErrorException cglobal(:jl_tls_states)
 end
+
+function test_thread_range()
+    a = zeros(Int, nthreads())
+    @threads for i in 1:threadid()
+        a[i] = 1
+    end
+    for i in 1:threadid()
+        @test a[i] == 1
+    end
+    for i in (threadid() + 1):nthreads()
+        @test a[i] == 0
+    end
+end
+test_thread_range()
+
+# Thread safety of `jl_load_and_lookup`.
+function test_load_and_lookup_18020(n)
+    @threads for i in 1:n
+        try
+            ccall(:jl_load_and_lookup,
+                  Ptr{Void}, (Cstring, Cstring, Ref{Ptr{Void}}),
+                  "$i", :f, C_NULL)
+        end
+    end
+end
+test_load_and_lookup_18020(10000)
+
+# Nested threaded loops
+# This may not be efficient/fully supported but should work without crashing.....
+function test_nested_loops()
+    a = zeros(Int, 100, 100)
+    @threads for i in 1:100
+        @threads for j in 1:100
+            a[j, i] = i + j
+        end
+    end
+    for i in 1:100
+        for j in 1:100
+            @test a[j, i] == i + j
+        end
+    end
+end
+test_nested_loops()

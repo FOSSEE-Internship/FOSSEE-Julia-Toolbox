@@ -7,9 +7,23 @@ unlock(::IO) = nothing
 reseteof(x::IO) = nothing
 
 const SZ_UNBUFFERED_IO = 65536
-buffer_writes(x::IO, bufsize=SZ_UNBUFFERED_IO) = nothing
+buffer_writes(x::IO, bufsize=SZ_UNBUFFERED_IO) = x
 
+"""
+    isopen(object) -> Bool
+
+Determine whether an object - such as a stream, timer, or mmap -- is not yet closed. Once an
+object is closed, it will never produce a new event. However, a closed stream may still have
+data to read in its buffer, use [`eof`](@ref) to check for the ability to read data.
+Use [`poll_fd`](@ref) to be notified when a stream might be writable or readable.
+"""
 function isopen end
+
+"""
+    close(stream)
+
+Close an I/O stream. Performs a [`flush`](@ref) first.
+"""
 function close end
 function flush end
 function wait_connected end
@@ -18,7 +32,19 @@ function wait_readbyte end
 function wait_close end
 function nb_available end
 function readavailable end
+
+"""
+    isreadable(io) -> Bool
+
+Returns `true` if the specified IO object is readable (if that can be determined).
+"""
 function isreadable end
+
+"""
+    iswritable(io) -> Bool
+
+Returns `true` if the specified IO object is writable (if that can be determined).
+"""
 function iswritable end
 function copy end
 function eof end
@@ -41,9 +67,9 @@ read(s::IO, ::Type{UInt8}) = error(typeof(s)," does not support byte I/O")
 write(s::IO, x::UInt8) = error(typeof(s)," does not support byte I/O")
 
 """
-    unsafe_write(io, ref, nbytes)
+    unsafe_write(io::IO, ref, nbytes::UInt)
 
-Copy nbytes from ref (converted to a pointer) into the IO stream object.
+Copy `nbytes` from `ref` (converted to a pointer) into the `IO` object.
 
 It is recommended that subtypes `T<:IO` override the following method signature
 to provide more efficient implementations:
@@ -58,9 +84,9 @@ function unsafe_write(s::IO, p::Ptr{UInt8}, n::UInt)
 end
 
 """
-    unsafe_read(io, ref, nbytes)
+    unsafe_read(io::IO, ref, nbytes::UInt)
 
-Copy nbytes from the IO stream object into ref (converted to a pointer).
+Copy `nbytes` from the `IO` stream object into `ref` (converted to a pointer).
 
 It is recommended that subtypes `T<:IO` override the following method signature
 to provide more efficient implementations:
@@ -75,7 +101,7 @@ end
 
 
 # Generic wrappers around other IO objects
-abstract AbstractPipe <: IO
+abstract type AbstractPipe <: IO end
 function pipe_reader end
 function pipe_writer end
 
@@ -87,7 +113,10 @@ flush(io::AbstractPipe) = flush(pipe_writer(io))
 read(io::AbstractPipe, byte::Type{UInt8}) = read(pipe_reader(io), byte)
 unsafe_read(io::AbstractPipe, p::Ptr{UInt8}, nb::UInt) = unsafe_read(pipe_reader(io), p, nb)
 read(io::AbstractPipe) = read(pipe_reader(io))
-readuntil{T<:AbstractPipe}(io::T, args...) = readuntil(pipe_reader(io), args...)
+readuntil(io::AbstractPipe, arg::UInt8)          = readuntil(pipe_reader(io), arg)
+readuntil(io::AbstractPipe, arg::Char)           = readuntil(pipe_reader(io), arg)
+readuntil(io::AbstractPipe, arg::AbstractString) = readuntil(pipe_reader(io), arg)
+readuntil(io::AbstractPipe, arg)                 = readuntil(pipe_reader(io), arg)
 readavailable(io::AbstractPipe) = readavailable(pipe_reader(io))
 
 isreadable(io::AbstractPipe) = isreadable(pipe_reader(io))
@@ -97,7 +126,23 @@ close(io::AbstractPipe) = (close(pipe_writer(io)); close(pipe_reader(io)))
 wait_readnb(io::AbstractPipe, nb::Int) = wait_readnb(pipe_reader(io), nb)
 wait_readbyte(io::AbstractPipe, byte::UInt8) = wait_readbyte(pipe_reader(io), byte)
 wait_close(io::AbstractPipe) = (wait_close(pipe_writer(io)); wait_close(pipe_reader(io)))
+
+"""
+    nb_available(stream)
+
+Returns the number of bytes available for reading before a read from this stream or buffer will block.
+"""
 nb_available(io::AbstractPipe) = nb_available(pipe_reader(io))
+
+"""
+    eof(stream) -> Bool
+
+Tests whether an I/O stream is at end-of-file. If the stream is not yet exhausted, this
+function will block to wait for more data if necessary, and then return `false`. Therefore
+it is always safe to read one byte after seeing `eof` return `false`. `eof` will return
+`false` as long as buffered data is still available, even if the remote end of a connection
+is closed.
+"""
 eof(io::AbstractPipe) = eof(pipe_reader(io))
 reseteof(io::AbstractPipe) = reseteof(pipe_reader(io))
 
@@ -106,15 +151,88 @@ reseteof(io::AbstractPipe) = reseteof(pipe_reader(io))
 
 write(filename::AbstractString, args...) = open(io->write(io, args...), filename, "w")
 
+"""
+    read(filename::AbstractString, args...)
+
+Open a file and read its contents. `args` is passed to `read`: this is equivalent to
+`open(io->read(io, args...), filename)`.
+"""
 read(filename::AbstractString, args...) = open(io->read(io, args...), filename)
 read!(filename::AbstractString, a) = open(io->read!(io, a), filename)
-readstring(filename::AbstractString) = open(readstring, filename)
-readuntil(filename::AbstractString, args...) = open(io->readuntil(io, args...), filename)
-readline(filename::AbstractString) = open(readline, filename)
-readlines(filename::AbstractString) = open(readlines, filename)
 
+"""
+    readuntil(stream::IO, delim)
+    readuntil(filename::AbstractString, delim)
+
+Read a string from an I/O stream or a file, up to and including the given delimiter byte.
+The text is assumed to be encoded in UTF-8.
+"""
+readuntil(filename::AbstractString, args...) = open(io->readuntil(io, args...), filename)
+
+"""
+    readline(stream::IO=STDIN; chomp::Bool=true)
+    readline(filename::AbstractString; chomp::Bool=true)
+
+Read a single line of text from the given I/O stream or file (defaults to `STDIN`).
+When reading from a file, the text is assumed to be encoded in UTF-8. Lines in the
+input end with `'\\n'` or `"\\r\\n"` or the end of an input stream. When `chomp` is
+true (as it is by default), these trailing newline characters are removed from the
+line before it is returned. When `chomp` is false, they are returned as part of the
+line.
+"""
+function readline(filename::AbstractString; chomp::Bool=true)
+    open(filename) do f
+        readline(f, chomp=chomp)
+    end
+end
+
+function readline(s::IO=STDIN; chomp::Bool=true)
+    line = readuntil(s, 0x0a)
+    i = length(line)
+    if !chomp || i == 0 || line[i] != 0x0a
+        return String(line)
+    elseif i < 2 || line[i-1] != 0x0d
+        return String(resize!(line,i-1))
+    else
+        return String(resize!(line,i-2))
+    end
+end
+
+"""
+    readlines(stream::IO=STDIN; chomp::Bool=true)
+    readlines(filename::AbstractString; chomp::Bool=true)
+
+Read all lines of an I/O stream or a file as a vector of strings. Behavior is
+equivalent to saving the result of reading `readline` repeatedly with the same
+arguments and saving the resulting lines as a vector of strings.
+"""
+function readlines(filename::AbstractString; chomp::Bool=true)
+    open(filename) do f
+        readlines(f, chomp=chomp)
+    end
+end
+readlines(s=STDIN; chomp::Bool=true) = collect(eachline(s, chomp=chomp))
 
 ## byte-order mark, ntoh & hton ##
+
+let endian_boms = reinterpret(UInt8, UInt32[0x01020304])
+    global ntoh, hton, ltoh, htol
+    if endian_boms == UInt8[1:4;]
+        ntoh(x) = x
+        hton(x) = x
+        ltoh(x) = bswap(x)
+        htol(x) = bswap(x)
+        const global ENDIAN_BOM = 0x01020304
+    elseif endian_boms == UInt8[4:-1:1;]
+        ntoh(x) = bswap(x)
+        hton(x) = bswap(x)
+        ltoh(x) = x
+        htol(x) = x
+        const global ENDIAN_BOM = 0x04030201
+    else
+        error("seriously? what is this machine?")
+    end
+end
 
 """
     ENDIAN_BOM
@@ -123,22 +241,42 @@ The 32-bit byte-order-mark indicates the native byte order of the host machine.
 Little-endian machines will contain the value `0x04030201`. Big-endian machines will contain
 the value `0x01020304`.
 """
-const ENDIAN_BOM = reinterpret(UInt32,UInt8[1:4;])[1]
+ENDIAN_BOM
 
-if ENDIAN_BOM == 0x01020304
-    ntoh(x) = x
-    hton(x) = x
-    ltoh(x) = bswap(x)
-    htol(x) = bswap(x)
-elseif ENDIAN_BOM == 0x04030201
-    ntoh(x) = bswap(x)
-    hton(x) = bswap(x)
-    ltoh(x) = x
-    htol(x) = x
-else
-    error("seriously? what is this machine?")
-end
+"""
+    ntoh(x)
 
+Converts the endianness of a value from Network byte order (big-endian) to that used by the Host.
+"""
+ntoh(x)
+
+"""
+    hton(x)
+
+Converts the endianness of a value from that used by the Host to Network byte order (big-endian).
+"""
+hton(x)
+
+"""
+    ltoh(x)
+
+Converts the endianness of a value from Little-endian to that used by the Host.
+"""
+ltoh(x)
+
+"""
+    htol(x)
+
+Converts the endianness of a value from that used by the Host to Little-endian.
+"""
+htol(x)
+
+
+"""
+    isreadonly(stream) -> Bool
+
+Determine whether a stream is read-only.
+"""
 isreadonly(s) = isreadable(s) && !iswritable(s)
 
 ## binary I/O ##
@@ -220,30 +358,37 @@ function write(to::IO, from::IO)
     end
 end
 
-@noinline unsafe_read{T}(s::IO, p::Ref{T}, n::Integer) = unsafe_read(s, unsafe_convert(Ref{T}, p)::Ptr, n) # mark noinline to ensure ref is gc-rooted somewhere (by the caller)
+@noinline unsafe_read(s::IO, p::Ref{T}, n::Integer) where {T} = unsafe_read(s, unsafe_convert(Ref{T}, p)::Ptr, n) # mark noinline to ensure ref is gc-rooted somewhere (by the caller)
 unsafe_read(s::IO, p::Ptr, n::Integer) = unsafe_read(s, convert(Ptr{UInt8}, p), convert(UInt, n))
-read{T}(s::IO, x::Ref{T}) = (unsafe_read(s, x, Core.sizeof(T)); x)
+read(s::IO, x::Ref{T}) where {T} = (unsafe_read(s, x, Core.sizeof(T)); x)
 
 read(s::IO, ::Type{Int8}) = reinterpret(Int8, read(s, UInt8))
 function read(s::IO, T::Union{Type{Int16},Type{UInt16},Type{Int32},Type{UInt32},Type{Int64},Type{UInt64},Type{Int128},Type{UInt128},Type{Float16},Type{Float32},Type{Float64}})
     return read(s, Ref{T}(0))[]::T
 end
 
-read(s::IO, ::Type{Bool})    = (read(s,UInt8)!=0)
-read{T}(s::IO, ::Type{Ptr{T}}) = convert(Ptr{T}, read(s, UInt))
+read(s::IO, ::Type{Bool}) = (read(s, UInt8) != 0)
+read(s::IO, ::Type{Ptr{T}}) where {T} = convert(Ptr{T}, read(s, UInt))
 
-read{T}(s::IO, t::Type{T}, d1::Int, dims::Int...) = read(s, t, tuple(d1,dims...))
-read{T}(s::IO, t::Type{T}, d1::Integer, dims::Integer...) =
+read(s::IO, t::Type{T}, d1::Int, dims::Int...) where {T} = read(s, t, tuple(d1,dims...))
+read(s::IO, t::Type{T}, d1::Integer, dims::Integer...) where {T} =
     read(s, t, convert(Tuple{Vararg{Int}},tuple(d1,dims...)))
 
-read{T}(s::IO, ::Type{T}, dims::Dims) = read!(s, Array{T}(dims))
+"""
+    read(stream::IO, T, dims)
+
+Read a series of values of type `T` from `stream`, in canonical binary representation.
+`dims` is either a tuple or a series of integer arguments specifying the size of the `Array{T}`
+to return.
+"""
+read(s::IO, ::Type{T}, dims::Dims) where {T} = read!(s, Array{T}(dims))
 
 @noinline function read!(s::IO, a::Array{UInt8}) # mark noinline to ensure the array is gc-rooted somewhere (by the caller)
     unsafe_read(s, pointer(a), sizeof(a))
     return a
 end
 
-@noinline function read!{T}(s::IO, a::Array{T}) # mark noinline to ensure the array is gc-rooted somewhere (by the caller)
+@noinline function read!(s::IO, a::Array{T}) where T # mark noinline to ensure the array is gc-rooted somewhere (by the caller)
     if isbits(T)
         unsafe_read(s, pointer(a), sizeof(a))
     else
@@ -273,9 +418,13 @@ function read(s::IO, ::Type{Char})
     return Char(c)
 end
 
+# readuntil_string is useful below since it has
+# an optimized method for s::IOStream
+readuntil_string(s::IO, delim::UInt8) = String(readuntil(s, delim))
+
 function readuntil(s::IO, delim::Char)
     if delim < Char(0x80)
-        return String(readuntil(s, delim % UInt8))
+        return readuntil_string(s, delim % UInt8)
     end
     out = IOBuffer()
     while !eof(s)
@@ -285,7 +434,7 @@ function readuntil(s::IO, delim::Char)
             break
         end
     end
-    return takebuf_string(out)
+    return String(take!(out))
 end
 
 function readuntil{T}(s::IO, delim::T)
@@ -310,7 +459,7 @@ function readuntil(s::IO, t::AbstractString)
         warn("readuntil(IO,AbstractString) will perform poorly with a long string")
     end
     out = IOBuffer()
-    m = Array{Char}(l)  # last part of stream to match
+    m = Vector{Char}(l)  # last part of stream to match
     t = collect(t)
     i = 0
     while !eof(s)
@@ -330,14 +479,26 @@ function readuntil(s::IO, t::AbstractString)
             break
         end
     end
-    return takebuf_string(out)
+    return String(take!(out))
 end
 
-readline() = readline(STDIN)
-readline(s::IO) = readuntil(s, '\n')
+"""
+    readchomp(x)
+
+Read the entirety of `x` as a string and remove a single trailing newline.
+Equivalent to `chomp!(readstring(x))`.
+"""
 readchomp(x) = chomp!(readstring(x))
 
 # read up to nb bytes into nb, returning # bytes read
+
+"""
+    readbytes!(stream::IO, b::AbstractVector{UInt8}, nb=length(b))
+
+Read at most `nb` bytes from `stream` into `b`, returning the number of bytes read.
+The size of `b` will be increased if needed (i.e. if `nb` is greater than `length(b)`
+and enough bytes could be read), but it will never be decreased.
+"""
 function readbytes!(s::IO, b::AbstractArray{UInt8}, nb=length(b))
     olb = lb = length(b)
     nr = 0
@@ -364,39 +525,59 @@ Read at most `nb` bytes from `s`, returning a `Vector{UInt8}` of the bytes read.
 function read(s::IO, nb=typemax(Int))
     # Let readbytes! grow the array progressively by default
     # instead of taking of risk of over-allocating
-    b = Array{UInt8}(nb == typemax(Int) ? 1024 : nb)
+    b = Vector{UInt8}(nb == typemax(Int) ? 1024 : nb)
     nr = readbytes!(s, b, nb)
     return resize!(b, nr)
 end
 
+"""
+    readstring(stream::IO)
+    readstring(filename::AbstractString)
+
+Read the entire contents of an I/O stream or a file as a string.
+The text is assumed to be encoded in UTF-8.
+"""
 readstring(s::IO) = String(read(s))
+readstring(filename::AbstractString) = open(readstring, filename)
 
 ## high-level iterator interfaces ##
 
-type EachLine
+mutable struct EachLine
     stream::IO
     ondone::Function
-    EachLine(stream) = EachLine(stream, ()->nothing)
-    EachLine(stream, ondone) = new(stream, ondone)
+    chomp::Bool
+
+    EachLine(stream::IO=STDIN; ondone::Function=()->nothing, chomp::Bool=true) =
+        new(stream, ondone, chomp)
 end
-eachline(stream::IO) = EachLine(stream)
-function eachline(filename::AbstractString)
+
+"""
+    eachline(stream::IO=STDIN; chomp::Bool=true)
+    eachline(filename::AbstractString; chomp::Bool=true)
+
+Create an iterable `EachLine` object that will yield each line from an I/O stream
+or a file. Iteration calls `readline` on the stream argument repeatedly with
+`chomp` passed through, determining whether trailing end-of-line characters are
+removed. When called with a file name, the file is opened once at the beginning of
+iteration and closed at the end. If iteration is interrupted, the file will be
+closed when the `EachLine` object is garbage collected.
+"""
+eachline(stream::IO=STDIN; chomp::Bool=true) = EachLine(stream, chomp=chomp)::EachLine
+
+function eachline(filename::AbstractString; chomp::Bool=true)
     s = open(filename)
-    EachLine(s, ()->close(s))
+    EachLine(s, ondone=()->close(s), chomp=chomp)::EachLine
 end
 
 start(itr::EachLine) = nothing
-function done(itr::EachLine, nada)
-    if !eof(itr.stream)
-        return false
-    end
+function done(itr::EachLine, ::Void)
+    eof(itr.stream) || return false
     itr.ondone()
     true
 end
-next(itr::EachLine, nada) = (readline(itr.stream), nothing)
-eltype(::Type{EachLine}) = String
+next(itr::EachLine, ::Void) = (readline(itr.stream, chomp=itr.chomp), nothing)
 
-readlines(s=STDIN) = collect(eachline(s))
+eltype(::Type{EachLine}) = String
 
 iteratorsize(::Type{EachLine}) = SizeUnknown()
 
@@ -405,17 +586,39 @@ iteratorsize(::Type{EachLine}) = SizeUnknown()
 # the concrete IO type. This may not be true for IO types
 # not in base.
 
+"""
+    mark(s)
+
+Add a mark at the current position of stream `s`. Returns the marked position.
+
+See also [`unmark`](@ref), [`reset`](@ref), [`ismarked`](@ref).
+"""
 function mark(io::IO)
     io.mark = position(io)
 end
 
+"""
+    unmark(s)
+
+Remove a mark from stream `s`. Returns `true` if the stream was marked, `false` otherwise.
+
+See also [`mark`](@ref), [`reset`](@ref), [`ismarked`](@ref).
+"""
 function unmark(io::IO)
     !ismarked(io) && return false
     io.mark = -1
     return true
 end
 
-function reset{T<:IO}(io::T)
+"""
+    reset(s)
+
+Reset a stream `s` to a previously marked position, and remove the mark. Returns the
+previously marked position. Throws an error if the stream is not marked.
+
+See also [`mark`](@ref), [`unmark`](@ref), [`ismarked`](@ref).
+"""
+function reset(io::T) where T<:IO
     ismarked(io) || throw(ArgumentError("$(T) not marked"))
     m = io.mark
     seek(io, m)
@@ -423,8 +626,21 @@ function reset{T<:IO}(io::T)
     return m
 end
 
+"""
+    ismarked(s)
+
+Returns `true` if stream `s` is marked.
+
+See also [`mark`](@ref), [`unmark`](@ref), [`reset`](@ref).
+"""
 ismarked(io::IO) = io.mark >= 0
 
 # Make sure all IO streams support flush, even if only as a no-op,
 # to make it easier to write generic I/O code.
+
+"""
+    flush(stream)
+
+Commit all currently buffered writes to the given stream.
+"""
 flush(io::IO) = nothing

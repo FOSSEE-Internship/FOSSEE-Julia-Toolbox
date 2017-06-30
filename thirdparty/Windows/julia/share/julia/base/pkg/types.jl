@@ -6,7 +6,7 @@ export VersionInterval, VersionSet, Requires, Available, Fixed, merge_requires!,
        ResolveBacktraceItem, ResolveBacktrace
 import Base: show, isempty, in, intersect, union!, union, ==, hash, copy, deepcopy_internal, push!
 
-immutable VersionInterval
+struct VersionInterval
     lower::VersionNumber
     upper::VersionNumber
 end
@@ -20,8 +20,50 @@ intersect(a::VersionInterval, b::VersionInterval) = VersionInterval(max(a.lower,
 ==(a::VersionInterval, b::VersionInterval) = a.lower == b.lower && a.upper == b.upper
 hash(i::VersionInterval, h::UInt) = hash((i.lower, i.upper), h + (0x0f870a92db508386 % UInt))
 
-immutable VersionSet
+function normalize!(ivals::Vector{VersionInterval})
+    # VersionSet internal normalization:
+    # removes empty intervals and fuses intervals without gaps
+    # e.g.:
+    #     [0.0.0,1.0.0) ∪ [1.0.0,1.5.0) ∪ [1.6.0,1.6.0) ∪ [2.0.0,∞)
+    # becomes:
+    #     [0.0.0,1.5.0) ∪ [2.0.0,∞)
+    # (still assumes that lower bounds are sorted, and intervals do
+    # not overlap)
+    l = length(ivals)
+    l == 0 && return ivals
+
+    lo, up, k0 = ivals[1].lower, ivals[1].upper, 1
+    fusing = false
+    for k = 2:l
+        lo1, up1 = ivals[k].lower, ivals[k].upper
+        if lo1 == up
+            up = up1
+            fusing = true
+            continue
+        end
+        if lo < up
+            # The only purpose of the "fusing" check is to avoid
+            # extra allocations
+            ivals[k0] = fusing ? VersionInterval(lo, up) : ivals[k-1]
+            k0 += 1
+        end
+        fusing = false
+        lo, up = lo1, up1
+    end
+    if lo < up
+        ivals[k0] = fusing ? VersionInterval(lo, up) : ivals[l]
+        k0 += 1
+    end
+    resize!(ivals, k0 - 1)
+    return ivals
+end
+
+struct VersionSet
     intervals::Vector{VersionInterval}
+    VersionSet(intervals::Vector{VersionInterval}) = new(normalize!(intervals))
+    # copy is defined inside the struct block to call `new` directly
+    # without going through `normalize!`
+    Base.copy(vset::VersionSet) = new(copy(vset.intervals))
 end
 function VersionSet(versions::Vector{VersionNumber})
     intervals = VersionInterval[]
@@ -37,51 +79,25 @@ function VersionSet(versions::Vector{VersionNumber})
 end
 VersionSet(versions::VersionNumber...) = VersionSet(VersionNumber[versions...])
 
-show(io::IO, s::VersionSet) = join(io, s.intervals, " ∪ ")
+const empty_versionset = VersionSet(VersionInterval[])
+
+# Windows console doesn't like Unicode
+const _empty_symbol = @static is_windows() ? "empty" : "∅"
+const _union_symbol = @static is_windows() ? " or " : " ∪ "
+show(io::IO, s::VersionSet) = isempty(s) ? print(io, _empty_symbol) :
+                                           join(io, s.intervals, _union_symbol)
 isempty(s::VersionSet) = all(isempty, s.intervals)
 in(v::VersionNumber, s::VersionSet) = any(i->in(v,i), s.intervals)
 function intersect(A::VersionSet, B::VersionSet)
-    ivals = vec([intersect(a,b) for a in A.intervals, b in B.intervals])
-    filter!(i->!isempty(i), ivals)
+    (isempty(A) || isempty(B)) && return copy(empty_versionset)
+    ivals = [intersect(a,b) for a in A.intervals for b in B.intervals]
     sort!(ivals, by=i->i.lower)
     VersionSet(ivals)
-end
-copy(A::VersionSet) = VersionSet(copy(A.intervals))
-
-function normalize!(A::VersionSet)
-    # removes empty intervals and fuses intervals without gaps
-    # e.g.:
-    #     [0.0.0,1.0.0) ∪ [1.0.0,1.5.0) ∪ [1.6.0,1.6.0) ∪ [2.0.0,∞)
-    # becomes:
-    #     [0.0.0,1.5.0) ∪ [2.0.0,∞)
-    # (still assumes that intervals are properly sorted)
-    ivals = A.intervals
-    l = length(ivals)
-    for k = l:-1:1
-        isempty(ivals[k]) && (splice!(ivals, k); l -= 1)
-    end
-    l > 1 || return A
-    lo, up, k0 = ivals[l].lower, ivals[l].upper, l
-    fuse = false
-    for k = (l-1):-1:1
-        lo1, up1 = ivals[k].lower, ivals[k].upper
-        if up1 == lo
-            fuse = true
-            lo = lo1
-            continue
-        end
-        fuse && splice!(ivals, (k+1):k0, (VersionInterval(lo, up),))
-        fuse = false
-        lo, up = lo1, up1
-        k0 = k
-    end
-    fuse && splice!(ivals, 1:k0, (VersionInterval(lo, up),))
-    return A
 end
 
 union(A::VersionSet, B::VersionSet) = union!(copy(A), B)
 function union!(A::VersionSet, B::VersionSet)
-    A == B && return normalize!(A)
+    A == B && return A
     ivals = A.intervals
     for intB in B.intervals
         lB, uB = intB.lower, intB.upper
@@ -102,14 +118,15 @@ function union!(A::VersionSet, B::VersionSet)
             end
         end
     end
-    return normalize!(VersionSet(ivals))
+    normalize!(ivals)
+    return A
 end
 
 ==(A::VersionSet, B::VersionSet) = A.intervals == B.intervals
 hash(s::VersionSet, h::UInt) = hash(s.intervals, h + (0x2fd2ca6efa023f44 % UInt))
 deepcopy_internal(vs::VersionSet, ::ObjectIdDict) = copy(vs)
 
-typealias Requires Dict{String,VersionSet}
+const Requires = Dict{String,VersionSet}
 
 function merge_requires!(A::Requires, B::Requires)
     for (pkg,vers) in B
@@ -121,19 +138,20 @@ end
 satisfies(pkg::AbstractString, ver::VersionNumber, reqs::Requires) =
     !haskey(reqs, pkg) || in(ver, reqs[pkg])
 
-immutable Available
+struct Available
     sha1::String
     requires::Requires
 end
 
 ==(a::Available, b::Available) = a.sha1 == b.sha1 && a.requires == b.requires
 hash(a::Available, h::UInt) = hash((a.sha1, a.requires), h + (0xbc8ae0de9d11d972 % UInt))
+copy(a::Available) = Available(a.sha1, copy(a.requires))
 
 show(io::IO, a::Available) = isempty(a.requires) ?
     print(io, "Available(", repr(a.sha1), ")") :
     print(io, "Available(", repr(a.sha1), ",", a.requires, ")")
 
-immutable Fixed
+struct Fixed
     version::VersionNumber
     requires::Requires
 end
@@ -151,8 +169,8 @@ show(io::IO, f::Fixed) = isempty(f.requires) ?
 # required by anything that processes these things.
 
 
-typealias VersionReq Union{VersionNumber,VersionSet}
-typealias WhyReq Tuple{VersionReq,Any}
+const VersionReq = Union{VersionNumber,VersionSet}
+const WhyReq = Tuple{VersionReq,Any}
 
 # This is used to keep track of dependency relations when propagating
 # requirements, so as to emit useful information in case of unsatisfiable
@@ -168,20 +186,18 @@ typealias WhyReq Tuple{VersionReq,Any}
 #    required packages), or a Pair p=>backtrace_item (for requirements induced
 #    indirectly, where `p` is the package name and `backtrace_item` is
 #    another ResolveBacktraceItem.
-type ResolveBacktraceItem
+mutable struct ResolveBacktraceItem
     versionreq::VersionReq
     why::Vector{WhyReq}
     ResolveBacktraceItem() = new(VersionSet(), WhyReq[])
     ResolveBacktraceItem(reason, versionreq::VersionReq) = new(versionreq, WhyReq[(versionreq,reason)])
 end
 
-const empty_versionset = VersionSet([v"0.0",v"0.0"])
-
 function push!(ritem::ResolveBacktraceItem, reason, versionset::VersionSet)
     if isa(ritem.versionreq, VersionSet)
         ritem.versionreq = ritem.versionreq ∩ versionset
     elseif ritem.versionreq ∉ versionset
-        ritem.versionreq = empty_versionset
+        ritem.versionreq = copy(empty_versionset)
     end
     push!(ritem.why, (versionset,reason))
 end
@@ -191,10 +207,10 @@ function push!(ritem::ResolveBacktraceItem, reason, version::VersionNumber)
         if version ∈ ritem.versionreq
             ritem.versionreq = version
         else
-            ritem.versionreq = empty_versionset
+            ritem.versionreq = copy(empty_versionset)
         end
     elseif ritem.versionreq ≠ version
-        ritem.versionreq = empty_versionset
+        ritem.versionreq = copy(empty_versionset)
     end
     push!(ritem.why, (version,reason))
 end
@@ -213,9 +229,7 @@ function _show(io::IO, ritem::ResolveBacktraceItem, indent::String, seen::Set{Re
             @assert isa(vs, VersionSet)
             println(io, "version range $vs set by an explicit requirement")
         else
-            @assert isa(w, Pair)
-            @assert isa(w[1], AbstractString)
-            @assert isa(w[2], ResolveBacktraceItem)
+            @assert isa(w, Pair{<:AbstractString,ResolveBacktraceItem})
             if isa(vs, VersionNumber)
                 print(io, "version $vs ")
             else
@@ -223,11 +237,7 @@ function _show(io::IO, ritem::ResolveBacktraceItem, indent::String, seen::Set{Re
             end
             print(io, "required by package $(w[1]), ")
             if isa(w[2].versionreq, VersionSet)
-                if !isempty(w[2].versionreq)
-                    println(io, "whose allowed version range is $(w[2].versionreq):")
-                else
-                    println(io, "whose allowed version range is empty:")
-                end
+                println(io, "whose allowed version range is $(w[2].versionreq):")
             else
                 println(io, "whose only allowed version is $(w[2].versionreq):")
             end
@@ -241,6 +251,6 @@ function _show(io::IO, ritem::ResolveBacktraceItem, indent::String, seen::Set{Re
     end
 end
 
-typealias ResolveBacktrace Dict{AbstractString,ResolveBacktraceItem}
+const ResolveBacktrace = Dict{AbstractString,ResolveBacktraceItem}
 
 end # module
