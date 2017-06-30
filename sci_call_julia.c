@@ -188,6 +188,76 @@ int jl_to_sci(jl_value_t *ret, int position) {
     return 1;
 }
 
+int sci_to_jl(int *piAddressVar, jl_value_t **ret) {
+    int err = 0;
+    int iType = 0;
+    char *fname = "sci_to_jl";
+    SciErr sciErr = getVarType(pvApiCtx, piAddressVar, &iType);
+    if (sciErr.iErr)
+    {
+        printError(&sciErr, 0);
+        return 0;
+    }
+
+    sciprint("%s: argument #: VarType: %d\n", fname, iType);
+    if (isDoubleType(pvApiCtx, piAddressVar)) {
+        sciprint("%s: argument #: Double variable\n", fname);
+        err = double_sci_to_jl(piAddressVar, ret);
+    }
+    else if (isBooleanType(pvApiCtx, piAddressVar)) {
+        sciprint("%s: argument #: Boolean variable\n", fname);
+        err = bool_sci_to_jl(piAddressVar, ret);    
+    }
+    else if (isIntegerType(pvApiCtx, piAddressVar)) {
+        sciprint("%s: argument #: Integer variable\n", fname);
+        err = int_sci_to_jl(piAddressVar, ret);
+    }
+    else if (isStringType(pvApiCtx, piAddressVar)) {
+        sciprint("%s: argument #: String variable\n", fname);
+        err = string_sci_to_jl(piAddressVar, ret);
+    }
+    else if(isHypermatType(pvApiCtx, piAddressVar)) {
+        sciprint("%s: argument #: Hypermat variable\n", fname);
+        int varType;
+        sciErr = getHypermatType(pvApiCtx, piAddressVar, &varType);
+        if (sciErr.iErr)
+        {
+            printError(&sciErr, 0);
+            return 0;
+        }
+
+        sciprint("%s: argument #: Variable type %d \n", fname, varType);
+        
+        switch(varType) {
+            case 1: // double
+                err = double_sci_to_jl(piAddressVar, ret);
+                break;
+            case 4: // boolean
+                err = bool_sci_to_jl(piAddressVar, ret);
+                break;
+            case 8: // integer
+                err = int_sci_to_jl(piAddressVar, ret);
+                break;
+            case 10: // string
+                err = string_sci_to_jl(piAddressVar, ret);
+            default:
+                break;
+        }
+    }
+    else if(isSparseType(pvApiCtx, piAddressVar)) {
+        sciprint("%s: argument #: Sparse variable\n", fname);
+        err = sparse_sci_to_jl(piAddressVar, ret);
+    }
+    else {
+        Scierror(999, "%s: argument # not implemented yet\n", fname);
+        return 0;
+    }
+    if(err == 0) {
+        return err;
+    }
+    return 1;
+}
+
 int sci_eval_julia(char *fname, unsigned long fname_len) {
     // Error management variable
     SciErr sciErr;
@@ -298,73 +368,11 @@ int sci_call_julia(char *fname, unsigned long fname_len) {
             return 0;
         }
         
-        int iType = 0;
-        sciErr = getVarType(pvApiCtx, piAddressVar, &iType);
-
-        if (sciErr.iErr)
-        {
+        err = sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
+        if (err == 0) {
             JL_GC_POP();
-            printError(&sciErr, 0);
+            Scierror(999, "%s: Error in convert scilab variable to julia\n", fname);
             return 0;
-        }
-
-        sciprint("%s: argument #%d: VarType: %d\n", fname, i + 1, iType);
-        if (isDoubleType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Double variable\n", fname, i + 1);
-            err = double_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
-        }
-        else if (isBooleanType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Boolean variable\n", fname, i + 1);
-            err = bool_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));    
-        }
-        else if (isIntegerType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Integer variable\n", fname, i + 1);
-            err = int_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
-        }
-        else if (isStringType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: String variable\n", fname, i + 1);
-            err = string_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
-        }
-        else if(isHypermatType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Hypermat variable\n", fname, i + 1);
-            int varType;
-            sciErr = getHypermatType(pvApiCtx, piAddressVar, &varType);
-            if (sciErr.iErr)
-            {
-                JL_GC_POP();
-                printError(&sciErr, 0);
-                return 0;
-            }
-
-            sciprint("%s: argument #%d: Variable type %d \n", fname, i + 1, varType);
-            
-            switch(varType) {
-                case 1: // double
-                    err = double_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
-                    break;
-                case 4: // boolean
-                    err = bool_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
-                    break;
-                case 8: // integer
-                    err = int_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
-                    break;
-                case 10: // string
-                    err = string_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
-                default:
-                    break;
-            }
-        }
-        else if(isSparseType(pvApiCtx, piAddressVar)) {
-            sciprint("%s: argument #%d: Sparse variable\n", fname, i + 1);
-            err = sparse_sci_to_jl(piAddressVar, &(inpArgs[i - 1]));
-        }
-        else {
-            Scierror(999, "%s: argument #%d not implemented yet\n", fname, i + 1);
-            return 0;
-        }
-        if(err == 0) {
-            JL_GC_POP();
-            return err;
         }
     }
 
