@@ -35,10 +35,6 @@
 // m = sparse(n)
 // c= callJulia('+', m', m') 
 
-// // modules testing
-// importJuliaPackage('FastTransforms')
-// c = evalJulia('rand(101)')
-// d = callJulia('leg2cheb', c)
 
 // testing for boolean
 // [z] = callJulia('!', %T)
@@ -46,3 +42,8 @@
 // [z] = callJulia('!', t)
 M = hypermat([2 3 2 2], [%T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F, %T, %T, %T, %F, %T, %F])
 [x] = callJulia('!', M)
+
+// modules testing
+importJuliaPackage('FastTransforms')
+c = evalJulia('rand(101)')
+d = callJulia('leg2cheb', c)

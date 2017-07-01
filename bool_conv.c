@@ -161,29 +161,16 @@ int bool_jl_to_sci(jl_value_t *input, int position) {
                 sciprint("%d, ", zData[i/64] & 1 << (i%64));
             sciprint("\n");
 
-            int64_t *dimensions = &(ret->dims);
-            ndims = 0;
-            while(dimensions[ndims] != 0) {
-                ndims ++;
-            }
-            // sciprint("ndims: %d\n", sizeof(dimensions)/sizeof(int32_t));
-            // sciprint("dims: %s type \n",jl_typeof_str(ret->dims));
-            // ndims = jl_nfields(dimensions);
+            ndims = jl_unbox_int64(jl_svec_data( ((jl_datatype_t *) jl_typeof(input))->parameters)[0]);
 
+            int64_t *dimensions = &(ret->dims);
             dims = (int*) malloc(ndims * sizeof(int));
-            for (int i = 0; i != ndims; i++){
+            for (int i = 0; i != ndims; i++)
                 dims[i] = dimensions[i];
-                // if (i == 0)
-                //     dims[i] = len;
-                // else 
-                //     dims[i] = 1;
-                // dims[i] = jl_unbox_int64(jl_get_field(dimensions, i));
-            }
 
             data = (int*) malloc(len * sizeof(int));
-            for (int i = 0; i != len; i++) {
+            for (int i = 0; i != len; i++) 
                 data[i] = zData[i/64] & 1 << (i%64);
-            }
 
             sciprint("size: (");
             for (int i = 0; i != ndims; i++){

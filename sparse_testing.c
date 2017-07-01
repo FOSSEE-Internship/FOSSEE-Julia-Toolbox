@@ -69,6 +69,14 @@ int main() {
 
     jl_bit_array_t *ret = (jl_bit_array_t*) jl_eval_string(".!([true true false; true true true; true false false])");
 
+    int nf = jl_nfields((jl_value_t*) ret);
+
+    jl_datatype_t *type = jl_typeof((jl_value_t*) ret);
+
+
+
+    printf("No. of fields: %d\n", jl_unbox_int64(jl_svec_data(type->parameters)[0]));
+
     int64_t len = ret->len;
     printf("%s: BitArray, len: %d \n", "bool_jl_to_sci", len);
     uint64_t *zData = (uint64_t*) jl_array_data(ret->chunks);
