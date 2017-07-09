@@ -27,7 +27,7 @@ function builder_gw_cpp()
 	setenv('JULIA_DIR', julia_dir)
 	setenv('JULIA_HOME', julia_dir + filesep() + 'bin')
 
-	ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'evalJulia', 'sci_eval_julia'; 'exitJulia', 'sci_exit_julia'; 'importJuliaPackage', 'sci_import_package';], files, [julialibpath + filesep() + 'libjulia'], [], ldflag, include);
+	ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'evalJulia', 'sci_eval_julia'; 'getGlobalJulia', 'sci_get_global_julia'; 'exitJulia', 'sci_exit_julia'; 'importJuliaPackage', 'sci_import_package';], files, [julialibpath + filesep() + 'libjulia'], [], ldflag, include);
 	// ilib_build('build_lib', ['callJulia','sci_call_julia'; 'initJulia', 'sci_init_julia'; 'exitJulia', 'sci_exit_julia'], files, [], [], ldflag, include);
 
 	// setenv('LD_LIBRARY_PATH', third_party_dir + '/linux/julia/lib/julia:' + third_party_dir + '/linux/julia/lib:' + getenv('LD_LIBRARY_PATH'))

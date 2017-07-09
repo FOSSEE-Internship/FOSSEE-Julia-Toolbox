@@ -9,12 +9,14 @@ static int direct_gateway(char *fname,void F(void)) { F();return 0;};
 extern Gatefunc sci_call_julia;
 extern Gatefunc sci_init_julia;
 extern Gatefunc sci_eval_julia;
+extern Gatefunc sci_get_global_julia;
 extern Gatefunc sci_exit_julia;
 extern Gatefunc sci_import_package;
 static GenericTable Tab[]={
   {(Myinterfun)sci_gateway,sci_call_julia,"callJulia"},
   {(Myinterfun)sci_gateway,sci_init_julia,"initJulia"},
   {(Myinterfun)sci_gateway,sci_eval_julia,"evalJulia"},
+  {(Myinterfun)sci_gateway,sci_get_global_julia,"getGlobalJulia"},
   {(Myinterfun)sci_gateway,sci_exit_julia,"exitJulia"},
   {(Myinterfun)sci_gateway,sci_import_package,"importJuliaPackage"},
 };

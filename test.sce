@@ -49,4 +49,9 @@ c = evalJulia('rand(9)')
 d = callJulia('leg2cheb', c)
 e = callJulia('cheb2leg', d)
 
-callJulia('print', c)
+importJuliaPackage('SymmetricTensors')
+callJulia('print', evalJulia('SymmetricTensor'))
+callJulia('print', ones(4,4) )
+ptr = callJulia('convert', evalJulia('SymmetricTensor'), ones(4,4))
+
+callJulia('print', ptr)

@@ -14,6 +14,7 @@ link('/Users/harshithgoka/Documents/GitHub/scilab-julia-interface/thirdparty/Dar
 list_functions = [ 'callJulia';
                    'initJulia';
                    'evalJulia';
+                   'getGlobalJulia';
                    'exitJulia';
                    'importJuliaPackage';
 ];

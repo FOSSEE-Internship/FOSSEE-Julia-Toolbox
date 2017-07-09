@@ -81,7 +81,7 @@ int sci_import_package(char* fname, unsigned long fname_len) {
     sciprint("%s: importing \"%s\" \n", fname, importing);
     jl_value_t *temp = jl_eval_string(importing);
 
-    sciprint("%s: %s\n", fname, jl_typeof_str(temp));
+    // sciprint("%s: %s\n", fname, jl_typeof_str(temp));
     return 0;
 }
 
@@ -89,7 +89,6 @@ int jl_to_sci(jl_value_t *ret, int position) {
     if (jl_isa(ret, jl_get_global(jl_base_module, jl_symbol("Void")))) {
         return 1;
     }
-
     int err;
     
     size_t al;
@@ -173,9 +172,16 @@ int jl_to_sci(jl_value_t *ret, int position) {
                 err = sparse_jl_to_sci(newargs, nbInputArgument(pvApiCtx) + i + 1);
             }
             else {
-                sciprint("%s: %s variable\n", fname, jl_typeof_str(newargs));
-                Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
-                return 0;
+                sciprint("%s: %s variable, Since there's no equivalent type in Scilab, it is stored as just a pointer\n", fname, jl_typeof_str(newargs));
+                SciErr sciErr = createPointer(pvApiCtx, nbInputArgument(pvApiCtx) + i + 1, newargs);
+                if (sciErr.iErr)
+                {
+                    printError(&sciErr, 0);
+                    return 0;
+                }
+                // Scierror(999, "%s: non double types not implemented yet: double return expected\n", fname);
+
+                // return 0;
             }
         }
 
@@ -193,7 +199,7 @@ int jl_to_sci(jl_value_t *ret, int position) {
 }
 
 int sci_to_jl(int *piAddressVar, jl_value_t **ret) {
-    int err = 0;
+    int err = 1;
     int iType = 0;
     char *fname = "sci_to_jl";
     SciErr sciErr = getVarType(pvApiCtx, piAddressVar, &iType);
@@ -252,10 +258,21 @@ int sci_to_jl(int *piAddressVar, jl_value_t **ret) {
         sciprint("%s: argument #: Sparse variable\n", fname);
         err = sparse_sci_to_jl(piAddressVar, ret);
     }
+    else if(isPointerType(pvApiCtx, piAddressVar)) {
+        sciprint("%s: argument #: Pointer variable\n", fname);
+        sciErr = getPointer(pvApiCtx, piAddressVar, ret);
+        if (sciErr.iErr)
+        {
+            printError(&sciErr, 0);
+            return 0;
+        }
+        sciprint("%s: type: %s\n", fname, jl_typeof_str(*ret));
+    }
     else {
         Scierror(999, "%s: argument # not implemented yet\n", fname);
         return 0;
     }
+
     if(err == 0) {
         return err;
     }
@@ -295,6 +312,62 @@ int sci_eval_julia(char *fname, unsigned long fname_len) {
     int i = 0;
 
     jl_value_t *ret = jl_eval_string(string);
+    JL_GC_PUSH1(&ret);
+    
+    if (jl_exception_occurred()) {
+        sciprint("%s \n", jl_typeof_str(jl_exception_occurred()));
+        JL_GC_POP();
+        return 0;
+    }
+
+    sciprint("%s: convert julia variables to scilab\n", fname);
+    
+    err = jl_to_sci(ret, 0);
+    if (err == 0) {
+        JL_GC_POP();
+        Scierror(999, "%s: Error in convert julia variable to scilab\n", fname);
+        return 0;
+    }
+
+    JL_GC_POP();
+    sciprint("%s: exiting...\n", fname);
+
+    return 0;
+}
+
+int sci_get_global_julia(char *fname, unsigned long fname_len) {
+    // Error management variable
+    SciErr sciErr;
+
+    ////////// Variables declaration //////////
+    int *addrEvalString = NULL;
+    char * string = NULL;
+
+    int nInputArgs = nbInputArgument(pvApiCtx);
+    int nOutputArgs = nbOutputArgument(pvApiCtx);
+
+    ////////// Manage the first input argument (double) //////////
+    /* get Address of inputs */
+    sciErr = getVarAddressFromPosition(pvApiCtx, 1, &addrEvalString);
+    if (sciErr.iErr)
+    {
+        printError(&sciErr, 0);
+        return 0;
+    }
+
+    if(!isStringType(pvApiCtx, addrEvalString)) {
+        Scierror(999, "%s: argument #%d not a string: string expected\n", fname, 1);
+        return 0;
+    }
+
+    int err = getAllocatedSingleString(pvApiCtx, addrEvalString, &string);
+    if (err != 0)
+    {
+        return 0;
+    }
+    int i = 0;
+
+    jl_value_t *ret = jl_get_global(jl_main_module, string);
     JL_GC_PUSH1(&ret);
     
     if (jl_exception_occurred()) {
