@@ -1,0 +1,14 @@
+etc_tlbx  = get_absolute_file_path("Julia_Interface.start");
+etc_tlbx  = getshortpathname(etc_tlbx);
+root_tlbx = strncpy( etc_tlbx, length(etc_tlbx)-length("\etc\") );
+
+third_party_dir = root_tlbx + filesep() + 'thirdparty'
+
+julia_dir = third_party_dir + filesep() + getos() + filesep() + 'julia'
+julialibpath = julia_dir + filesep() + 'lib'
+
+if getos() == "Darwin" then
+	link(julialibpath + '/julia/libcurl.5' + getdynlibext());
+end
+
+exec(pathconvert(root_tlbx + filesep() + "sci_gateway" + filesep() + "loader_gateway.sce",%f));
